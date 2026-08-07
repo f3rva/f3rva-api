@@ -1,0 +1,603 @@
+{
+  "info": {
+    "_postman_id": "f3rva-api-collection-v1",
+    "name": "F3 API",
+    "description": "Postman Collection for F3 RVA modern Python serverless REST API endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string",
+      "description": "Base URL of the API (e.g. http://localhost:8000, https://api.dev.f3rva.org, https://api.f3rva.org)"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT Bearer token for protected admin endpoints (populated after /v2/admin/login)"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. System & Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Returns operational status, API version, and runtime environment."
+          }
+        },
+        {
+          "name": "Database Health Check",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health/db",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "db"]
+            },
+            "description": "Executes SELECT 1 against the configured MySQL database to verify connectivity."
+          }
+        },
+        {
+          "name": "OpenAPI Specification JSON",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/openapi.json",
+              "host": ["{{baseUrl}}"],
+              "path": ["openapi.json"]
+            },
+            "description": "Retrieves the complete OpenAPI 3.1 JSON specification."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Workouts & Backblasts (Phase 2)",
+      "item": [
+        {
+          "name": "Get Recent Workouts (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/workouts?page=1&results=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "workouts"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number starting at 1"
+                },
+                {
+                  "key": "results",
+                  "value": "20",
+                  "description": "Results per page (1-100)"
+                }
+              ]
+            },
+            "description": "Retrieves paginated recent workout backblasts."
+          }
+        },
+        {
+          "name": "Get Workouts by Date",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/workouts/by-date?year=2026&month=8&day=7&page=1&results=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "workouts", "by-date"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "8"
+                },
+                {
+                  "key": "day",
+                  "value": "7"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "results",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Retrieves workouts filtered by year, month, or exact day."
+          }
+        },
+        {
+          "name": "Get Workout by Date & Slug",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/workouts/by-date-slug?year=2026&month=8&day=7&slug=gridiron",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "workouts", "by-date-slug"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                },
+                {
+                  "key": "month",
+                  "value": "8"
+                },
+                {
+                  "key": "day",
+                  "value": "7"
+                },
+                {
+                  "key": "slug",
+                  "value": "gridiron"
+                }
+              ]
+            },
+            "description": "Retrieves a specific workout by date components and post slug."
+          }
+        },
+        {
+          "name": "Get Workouts by AO",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/workouts/ao/1?page=1&results=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "workouts", "ao", "1"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "results",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Retrieves workouts for a given AO ID or AO slug."
+          }
+        },
+        {
+          "name": "Get Workout Detail by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/workouts/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "workouts", "1"]
+            },
+            "description": "Retrieves full details for a workout including Qs, AOs, and PAX attendee list."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Members & PAX (Phase 3)",
+      "item": [
+        {
+          "name": "Get All Members",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "members"]
+            },
+            "description": "Returns alphabetical list of all registered members and their IDs."
+          }
+        },
+        {
+          "name": "Get Member Profile & History by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/members/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "members", "1"]
+            },
+            "description": "Returns member details, alias list, attended workouts, and Q'd workouts."
+          }
+        },
+        {
+          "name": "Get Member Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/members/1/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "members", "1", "stats"]
+            },
+            "description": "Returns member total workouts, Q count, and calculated Q-ratio."
+          }
+        },
+        {
+          "name": "Lookup Member by Name or Alias",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/members/lookup?name=Dingo",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "members", "lookup"],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "Dingo"
+                }
+              ]
+            },
+            "description": "Case-insensitive lookup across primary F3 names and aliases."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Reports & Analytics (Phase 4)",
+      "item": [
+        {
+          "name": "Attendance Counts Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/attendance?startDate=2026-07-01&endDate=2026-08-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "attendance"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-07-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-08-01"
+                }
+              ]
+            },
+            "description": "Returns attendance, workout count, Q count, and Q-ratio per member over date range."
+          }
+        },
+        {
+          "name": "AO Average Attendance Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/ao-averages?startDate=2026-07-01&endDate=2026-08-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "ao-averages"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-07-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-08-01"
+                }
+              ]
+            },
+            "description": "Returns average attendance per workout for all AOs across date range."
+          }
+        },
+        {
+          "name": "Day of Week Attendance Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/day-of-week?startDate=2026-07-01&endDate=2026-08-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "day-of-week"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-07-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-08-01"
+                }
+              ]
+            },
+            "description": "Aggregates total PAX attendance grouped by Monday through Sunday."
+          }
+        },
+        {
+          "name": "AO Streakers Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/streakers/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "streakers", "1"]
+            },
+            "description": "Calculates recursive streak count of consecutive workouts for an AO."
+          }
+        },
+        {
+          "name": "AO Leaderboards (Top PAX & Top Qs)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/leaderboards/1?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "leaderboards", "1"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Returns top attendee rankings and top workout leaders for an AO."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Self-Service & Admin (Phase 5)",
+      "item": [
+        {
+          "name": "Submit Alias Claim Request (Self-Service)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryMemberId\": 10,\n  \"aliasMemberId\": 25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/aliases/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "aliases", "request"]
+            },
+            "description": "Submits a request to claim an alias name for a primary member."
+          }
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"your-admin-password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/admin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "admin", "login"]
+            },
+            "description": "Authenticates the admin and returns a signed 24h JWT bearer token."
+          }
+        },
+        {
+          "name": "Get Pending Alias Requests (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/admin/aliases/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "admin", "aliases", "pending"]
+            },
+            "description": "Lists all pending alias requests awaiting approval."
+          }
+        },
+        {
+          "name": "Approve Alias Request (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": 10,\n  \"associatedMemberId\": 25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/admin/aliases/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "admin", "aliases", "approve"]
+            },
+            "description": "Executes atomic 8-step merger transaction for an alias request."
+          }
+        },
+        {
+          "name": "Reject Alias Request (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": 10,\n  \"associatedMemberId\": 25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/admin/aliases/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "admin", "aliases", "reject"]
+            },
+            "description": "Rejects a pending alias request."
+          }
+        },
+        {
+          "name": "Merge PAX Records (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryMemberId\": 10,\n  \"associatedMemberId\": 25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/admin/pax/merge",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "admin", "pax", "merge"]
+            },
+            "description": "Manually triggers an atomic merge between two member records."
+          }
+        }
+      ]
+    }
+  ]
+}
