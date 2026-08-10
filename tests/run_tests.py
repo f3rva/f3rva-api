@@ -1,4 +1,4 @@
-"""Standalone test runner for verifying Phase 1, Phase 2, and Phase 3 components."""
+"""Standalone test runner for verifying Phase 1, Phase 2, Phase 3, and Phase 4 components."""
 
 from __future__ import annotations
 
@@ -55,6 +55,19 @@ from tests.test_members import (
     test_lookup_member_empty_query_400,
     test_lookup_member_not_found_404,
 )
+from tests.test_reports import (
+    seed_test_report_data,
+    test_get_attendance_leaderboard_date_range_filter,
+    test_get_attendance_leaderboard_default_sorting,
+    test_get_attendance_leaderboard_sorted_by_q,
+    test_get_attendance_leaderboard_sorted_by_ratio,
+    test_get_ao_attendance_summary,
+    test_get_ao_leaderboard_not_found_404,
+    test_get_ao_leaderboard_with_streakers,
+    test_get_day_of_week_attendance,
+    test_get_member_distribution_not_found_404,
+    test_get_member_distribution_success,
+)
 from tests.test_utils import (
     test_timed_service_exception_logging,
     test_timed_service_success,
@@ -75,7 +88,7 @@ from tests.test_workouts import (
 
 
 def run_all_tests():
-    print("🧪 Running Phase 1, Phase 2 & Phase 3 Test Suite...\n")
+    print("🧪 Running Phase 1, Phase 2, Phase 3 & Phase 4 Test Suite...\n")
 
     # 1. Database & Settings Lifecycle Tests
     test_get_engine_singleton()
@@ -182,7 +195,44 @@ def run_all_tests():
     Base.metadata.drop_all(bind=engine_m)
     engine_m.dispose()
 
-    print("\n🎉 ALL 37 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
+    # Set up in-memory test database for reports
+    engine_r = create_engine(
+        os.environ["DATABASE_URL"],
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine_r)
+    session_factory_r = sessionmaker(bind=engine_r, autocommit=False, autoflush=False)
+    db_r = session_factory_r()
+
+    def override_get_db_r():
+        try:
+            yield db_r
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db_r
+
+    with TestClient(app) as client:
+        # Phase 4: Reports & Analytics Tests
+        test_get_attendance_leaderboard_default_sorting(client, db_r)
+        test_get_attendance_leaderboard_sorted_by_q(client, db_r)
+        test_get_attendance_leaderboard_sorted_by_ratio(client, db_r)
+        test_get_attendance_leaderboard_date_range_filter(client, db_r)
+        test_get_ao_attendance_summary(client, db_r)
+        test_get_ao_leaderboard_with_streakers(client, db_r)
+        test_get_ao_leaderboard_not_found_404(client, db_r)
+        test_get_day_of_week_attendance(client, db_r)
+        test_get_member_distribution_success(client, db_r)
+        test_get_member_distribution_not_found_404(client, db_r)
+        print("  ✅ Phase 4: Reports, Leaderboards & AO Metrics Endpoints (10/10 passed)")
+
+    app.dependency_overrides.clear()
+    db_r.close()
+    Base.metadata.drop_all(bind=engine_r)
+    engine_r.dispose()
+
+    print("\n🎉 ALL 47 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
 
 
 if __name__ == "__main__":

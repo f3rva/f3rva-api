@@ -100,20 +100,20 @@
                 {
                   "key": "page",
                   "value": "1",
-                  "description": "Page number starting at 1"
+                  "description": "Page number (1-based index)"
                 },
                 {
                   "key": "results",
                   "value": "20",
-                  "description": "Results per page (1-100)"
+                  "description": "Items per page (max 100)"
                 }
               ]
             },
-            "description": "Retrieves paginated recent workout backblasts."
+            "description": "Returns the most recent workouts ordered by date descending."
           }
         },
         {
-          "name": "Get Workouts by Date",
+          "name": "Get Workouts by Date (Year / Month / Day)",
           "request": {
             "method": "GET",
             "header": [
@@ -123,7 +123,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/by-date?year=2026&month=8&day=7&page=1&results=20",
+              "raw": "{{baseUrl}}/v2/workouts/by-date?year=2026&month=8&page=1&results=20",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "workouts", "by-date"],
               "query": [
@@ -137,7 +137,8 @@
                 },
                 {
                   "key": "day",
-                  "value": "7"
+                  "value": "",
+                  "disabled": true
                 },
                 {
                   "key": "page",
@@ -149,11 +150,11 @@
                 }
               ]
             },
-            "description": "Retrieves workouts filtered by year, month, or exact day."
+            "description": "Filters workouts by year, year+month, or exact day."
           }
         },
         {
-          "name": "Get Workout by Date & Slug",
+          "name": "Get Workout by Date and Slug",
           "request": {
             "method": "GET",
             "header": [
@@ -163,7 +164,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/by-date-slug?year=2026&month=8&day=7&slug=gridiron",
+              "raw": "{{baseUrl}}/v2/workouts/by-date-slug?year=2026&month=8&day=7&slug=beatdown-at-gridiron",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "workouts", "by-date-slug"],
               "query": [
@@ -181,15 +182,15 @@
                 },
                 {
                   "key": "slug",
-                  "value": "gridiron"
+                  "value": "beatdown-at-gridiron"
                 }
               ]
             },
-            "description": "Retrieves a specific workout by date components and post slug."
+            "description": "Retrieves workout matching exact date and URL slug."
           }
         },
         {
-          "name": "Get Workouts by AO",
+          "name": "Get Workouts by AO (ID or Slug)",
           "request": {
             "method": "GET",
             "header": [
@@ -199,9 +200,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/ao/1?page=1&results=20",
+              "raw": "{{baseUrl}}/v2/workouts/ao/gridiron?page=1&results=20",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "workouts", "ao", "1"],
+              "path": ["v2", "workouts", "ao", "gridiron"],
               "query": [
                 {
                   "key": "page",
@@ -213,11 +214,11 @@
                 }
               ]
             },
-            "description": "Retrieves workouts for a given AO ID or AO slug."
+            "description": "Retrieves paginated workouts for a specific Area of Operations."
           }
         },
         {
-          "name": "Get Workout Detail by ID",
+          "name": "Get Single Workout Detail by ID",
           "request": {
             "method": "GET",
             "header": [
@@ -227,11 +228,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/1",
+              "raw": "{{baseUrl}}/v2/workouts/101",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "workouts", "1"]
+              "path": ["v2", "workouts", "101"]
             },
-            "description": "Retrieves full details for a workout including Qs, AOs, and PAX attendee list."
+            "description": "Retrieves a single workout with complete PAX attendee list and HTML content."
           }
         }
       ]
@@ -254,7 +255,31 @@
               "host": ["{{baseUrl}}"],
               "path": ["v2", "members"]
             },
-            "description": "Returns alphabetical list of all registered members and their IDs."
+            "description": "Retrieves an alphabetical list of all registered members."
+          }
+        },
+        {
+          "name": "Lookup Member by Name or Alias",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/members/lookup?name=dingo",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "members", "lookup"],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "dingo"
+                }
+              ]
+            },
+            "description": "Searches members by primary F3 name or registered alias (case-insensitive)."
           }
         },
         {
@@ -272,11 +297,11 @@
               "host": ["{{baseUrl}}"],
               "path": ["v2", "members", "1"]
             },
-            "description": "Returns member details, alias list, attended workouts, and Q'd workouts."
+            "description": "Returns full member profile with aliases, attendance stats, and attended & Q'd workout history."
           }
         },
         {
-          "name": "Get Member Stats",
+          "name": "Get Member Attendance Stats",
           "request": {
             "method": "GET",
             "header": [
@@ -290,40 +315,16 @@
               "host": ["{{baseUrl}}"],
               "path": ["v2", "members", "1", "stats"]
             },
-            "description": "Returns member total workouts, Q count, and calculated Q-ratio."
-          }
-        },
-        {
-          "name": "Lookup Member by Name or Alias",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v2/members/lookup?name=Dingo",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "members", "lookup"],
-              "query": [
-                {
-                  "key": "name",
-                  "value": "Dingo"
-                }
-              ]
-            },
-            "description": "Case-insensitive lookup across primary F3 names and aliases."
+            "description": "Returns workout attendance count, Q count, and calculated Q-ratio (Qs / Workouts)."
           }
         }
       ]
     },
     {
-      "name": "4. Reports & Analytics (Phase 4)",
+      "name": "4. Reports, Leaderboards & AO Metrics (Phase 4)",
       "item": [
         {
-          "name": "Attendance Counts Report",
+          "name": "Attendance Leaderboard (Ranked by Workouts)",
           "request": {
             "method": "GET",
             "header": [
@@ -333,25 +334,34 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/attendance?startDate=2026-07-01&endDate=2026-08-01",
+              "raw": "{{baseUrl}}/v2/reports/attendance?startDate=2026-01-01&endDate=2026-12-31&sortBy=workout&limit=50",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "reports", "attendance"],
               "query": [
                 {
                   "key": "startDate",
-                  "value": "2026-07-01"
+                  "value": "2026-01-01"
                 },
                 {
                   "key": "endDate",
-                  "value": "2026-08-01"
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "workout",
+                  "description": "Ranking metric: workout (most workouts), q (most Qs), ratio (highest Q ratio)"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
                 }
               ]
             },
-            "description": "Returns attendance, workout count, Q count, and Q-ratio per member over date range."
+            "description": "Generates member attendance and Q leaderboard ranked by workout count."
           }
         },
         {
-          "name": "AO Average Attendance Report",
+          "name": "Attendance Leaderboard (Ranked by Qs)",
           "request": {
             "method": "GET",
             "header": [
@@ -361,25 +371,81 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/ao-averages?startDate=2026-07-01&endDate=2026-08-01",
+              "raw": "{{baseUrl}}/v2/reports/attendance?sortBy=q&limit=50",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "reports", "ao-averages"],
+              "path": ["v2", "reports", "attendance"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "q"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Ranks members by total workouts led (Q'd)."
+          }
+        },
+        {
+          "name": "Attendance Leaderboard (Ranked by Q-Ratio)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/attendance?sortBy=ratio&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "attendance"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "ratio"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Ranks members by highest Q-ratio (Qs / Workouts)."
+          }
+        },
+        {
+          "name": "AO Attendance Metrics Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/ao?startDate=2026-01-01&endDate=2026-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "ao"],
               "query": [
                 {
                   "key": "startDate",
-                  "value": "2026-07-01"
+                  "value": "2026-01-01"
                 },
                 {
                   "key": "endDate",
-                  "value": "2026-08-01"
+                  "value": "2026-12-31"
                 }
               ]
             },
-            "description": "Returns average attendance per workout for all AOs across date range."
+            "description": "Calculates total workouts, total PAX attendance sum, and average PAX per workout across all AOs."
           }
         },
         {
-          "name": "Day of Week Attendance Report",
+          "name": "AO Leaderboard & Active Streakers",
           "request": {
             "method": "GET",
             "header": [
@@ -389,55 +455,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/day-of-week?startDate=2026-07-01&endDate=2026-08-01",
+              "raw": "{{baseUrl}}/v2/reports/ao/1/leaderboard?limit=10",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "reports", "day-of-week"],
-              "query": [
-                {
-                  "key": "startDate",
-                  "value": "2026-07-01"
-                },
-                {
-                  "key": "endDate",
-                  "value": "2026-08-01"
-                }
-              ]
-            },
-            "description": "Aggregates total PAX attendance grouped by Monday through Sunday."
-          }
-        },
-        {
-          "name": "AO Streakers Report",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v2/reports/streakers/1",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "reports", "streakers", "1"]
-            },
-            "description": "Calculates recursive streak count of consecutive workouts for an AO."
-          }
-        },
-        {
-          "name": "AO Leaderboards (Top PAX & Top Qs)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v2/reports/leaderboards/1?limit=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "reports", "leaderboards", "1"],
+              "path": ["v2", "reports", "ao", "1", "leaderboard"],
               "query": [
                 {
                   "key": "limit",
@@ -445,7 +465,53 @@
                 }
               ]
             },
-            "description": "Returns top attendee rankings and top workout leaders for an AO."
+            "description": "Retrieves top Q leaders, top PAX attendees, and active consecutive attendance streaks for a specific AO."
+          }
+        },
+        {
+          "name": "Day of Week Attendance Breakdown",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/day-of-week?startDate=2026-01-01&endDate=2026-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "day-of-week"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-12-31"
+                }
+              ]
+            },
+            "description": "Aggregates total workouts, total PAX attendance, and average PAX per workout by day of the week (Sunday through Saturday)."
+          }
+        },
+        {
+          "name": "Member AO Attendance Distribution",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/reports/members/1/distribution",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "reports", "members", "1", "distribution"]
+            },
+            "description": "Calculates the breakdown of workouts attended and Q'd across every AO for a specific member."
           }
         }
       ]
@@ -453,6 +519,46 @@
     {
       "name": "5. Self-Service & Admin (Phase 5)",
       "item": [
+        {
+          "name": "Ingest / Scrape New Backblast Workout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://f3rva.org/2026/08/07/beatdown-at-gridiron\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/workouts",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "workouts"]
+            },
+            "description": "Scrapes a backblast URL and inserts the workout, AOs, Qs, and PAX attendees into the database."
+          }
+        },
+        {
+          "name": "Refresh / Re-scrape Existing Workout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/workouts/101/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "workouts", "101", "refresh"]
+            },
+            "description": "Re-scrapes the backblast URL for an existing workout and updates all attendees, Qs, and content."
+          }
+        },
         {
           "name": "Submit Alias Claim Request (Self-Service)",
           "request": {
@@ -512,11 +618,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/pending",
+              "raw": "{{baseUrl}}/v2/admin/aliases/requests",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "admin", "aliases", "pending"]
+              "path": ["v2", "admin", "aliases", "requests"]
             },
-            "description": "Lists all pending alias requests awaiting approval."
+            "description": "Retrieves all pending member alias requests (requires JWT auth)."
           }
         },
         {
@@ -529,20 +635,16 @@
                 "value": "Bearer {{authToken}}"
               },
               {
-                "key": "Content-Type",
+                "key": "Accept",
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"memberId\": 10,\n  \"associatedMemberId\": 25\n}"
-            },
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/approve",
+              "raw": "{{baseUrl}}/v2/admin/aliases/approve/1",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "admin", "aliases", "approve"]
+              "path": ["v2", "admin", "aliases", "approve", "1"]
             },
-            "description": "Executes atomic 8-step merger transaction for an alias request."
+            "description": "Approves an alias request, merges attendance records, and deletes the duplicate member record."
           }
         },
         {
@@ -555,46 +657,16 @@
                 "value": "Bearer {{authToken}}"
               },
               {
-                "key": "Content-Type",
+                "key": "Accept",
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"memberId\": 10,\n  \"associatedMemberId\": 25\n}"
-            },
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/reject",
+              "raw": "{{baseUrl}}/v2/admin/aliases/reject/1",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "admin", "aliases", "reject"]
+              "path": ["v2", "admin", "aliases", "reject", "1"]
             },
             "description": "Rejects a pending alias request."
-          }
-        },
-        {
-          "name": "Merge PAX Records (Admin)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{authToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"primaryMemberId\": 10,\n  \"associatedMemberId\": 25\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v2/admin/pax/merge",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "admin", "pax", "merge"]
-            },
-            "description": "Manually triggers an atomic merge between two member records."
           }
         }
       ]

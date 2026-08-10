@@ -66,6 +66,86 @@ class MemberDetailResponse(BaseModel):
     qd_workouts: list[WorkoutResponse] = Field(default_factory=list, alias="qdWorkouts", serialization_alias="qdWorkouts", description="Workouts led as Q")
 
 
+class AttendanceLeaderboardItem(BaseModel):
+    """Leaderboard item for member attendance over a given date range."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Member ID")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Nickname")
+    num_workouts: int = Field(..., alias="numWorkouts", serialization_alias="numWorkouts", description="Workouts attended in period")
+    num_qs: int = Field(..., alias="numQs", serialization_alias="numQs", description="Workouts led (Q'd) in period")
+    q_ratio: float = Field(..., alias="qRatio", serialization_alias="qRatio", description="Q to workout ratio in period")
+
+
+class AOAttendanceSummary(BaseModel):
+    """Statistical summary of workout attendance across an Area of Operations (AO)."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    ao_id: int = Field(..., alias="aoId", serialization_alias="aoId", description="AO ID")
+    description: str = Field(..., description="AO Name / Description")
+    slug: str | None = Field(default=None, description="AO URL slug")
+    total_workouts: int = Field(..., alias="totalWorkouts", serialization_alias="totalWorkouts", description="Total workouts conducted")
+    total_pax: int = Field(..., alias="totalPax", serialization_alias="totalPax", description="Total PAX attendance sum")
+    average_pax: float = Field(..., alias="averagePax", serialization_alias="averagePax", description="Average PAX per workout")
+
+
+class LeaderboardEntry(BaseModel):
+    """Generic leaderboard entry for top Qs, top attendees, and streakers."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int = Field(..., description="Entity identifier (Member ID or AO ID)")
+    name: str = Field(..., description="Entity display name")
+    count: int = Field(..., description="Count or streak value")
+
+
+class AOLeaderboardResponse(BaseModel):
+    """Leaderboard analytics for a specific AO including top leaders, top PAX, and active streaks."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    ao_id: int = Field(..., alias="aoId", serialization_alias="aoId", description="AO ID")
+    description: str = Field(..., description="AO Description")
+    top_qs: list[LeaderboardEntry] = Field(default_factory=list, alias="topQs", serialization_alias="topQs", description="Top Q leaders at this AO")
+    top_pax: list[LeaderboardEntry] = Field(default_factory=list, alias="topPax", serialization_alias="topPax", description="Top PAX attendees at this AO")
+    streakers: list[LeaderboardEntry] = Field(default_factory=list, description="Members with consecutive workout attendance streaks")
+
+
+class DayOfWeekAttendance(BaseModel):
+    """Attendance statistics grouped by day of the week."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    day_id: int = Field(..., alias="dayId", serialization_alias="dayId", description="Day Index (1=Sunday, 7=Saturday)")
+    day_name: str = Field(..., alias="dayName", serialization_alias="dayName", description="Day Name (e.g. Monday)")
+    workout_count: int = Field(..., alias="workoutCount", serialization_alias="workoutCount", description="Workouts hosted on this day")
+    total_pax: int = Field(..., alias="totalPax", serialization_alias="totalPax", description="Sum of PAX attendance on this day")
+    average_pax: float = Field(..., alias="averagePax", serialization_alias="averagePax", description="Average PAX per workout")
+
+
+class MemberAODistribution(BaseModel):
+    """Breakdown of workouts attended and Q'd by AO for a specific member."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    ao_id: int = Field(..., alias="aoId", serialization_alias="aoId", description="AO ID")
+    description: str = Field(..., description="AO Name")
+    q_count: int = Field(..., alias="qCount", serialization_alias="qCount", description="Workouts Q'd at this AO")
+    pax_count: int = Field(..., alias="paxCount", serialization_alias="paxCount", description="Workouts attended at this AO")
+
+
+class MemberDistributionResponse(BaseModel):
+    """Member AO attendance distribution response."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Member ID")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="Member Name")
+    distribution: list[MemberAODistribution] = Field(default_factory=list, description="AO attendance breakdown")
+
+
 class ErrorResponse(BaseModel):
     """Standard error response matching legacy PHP JSON structure."""
 
