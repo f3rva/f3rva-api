@@ -42,6 +42,30 @@ class WorkoutResponse(BaseModel):
     content: str | None = Field(default=None, description="Backblast HTML Content")
 
 
+class MemberStatsResponse(BaseModel):
+    """Member statistical summary representing workout attendance and Q ratios."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Unique Member ID")
+    num_workouts: int = Field(..., alias="numWorkouts", serialization_alias="numWorkouts", description="Total workouts attended")
+    num_qs: int = Field(..., alias="numQs", serialization_alias="numQs", description="Total workouts led (Q'd)")
+    q_ratio: float = Field(..., alias="qRatio", serialization_alias="qRatio", description="Ratio of Qs to total workouts (0.0 to 1.0)")
+
+
+class MemberDetailResponse(BaseModel):
+    """Comprehensive member profile including aliases, stats, and workout histories."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True, str_strip_whitespace=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Unique Member ID")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="Primary F3 Name")
+    aliases: list[str] = Field(default_factory=list, description="Registered aliases for this member")
+    stats: MemberStatsResponse | None = Field(default=None, description="Workout attendance and Q stats")
+    attended_workouts: list[WorkoutResponse] = Field(default_factory=list, alias="attendedWorkouts", serialization_alias="attendedWorkouts", description="Workouts attended as PAX")
+    qd_workouts: list[WorkoutResponse] = Field(default_factory=list, alias="qdWorkouts", serialization_alias="qdWorkouts", description="Workouts led as Q")
+
+
 class ErrorResponse(BaseModel):
     """Standard error response matching legacy PHP JSON structure."""
 

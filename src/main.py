@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from src.config.database import get_db
 from src.config.settings import get_settings
 from src.config.version import get_version
-from src.routers import workouts
+from src.routers import members, workouts
 
 settings = get_settings()
 APP_VERSION = get_version()
@@ -63,6 +63,7 @@ app.add_middleware(
 
 # Mount Domain Routers
 app.include_router(workouts.router, prefix="/v2/workouts", tags=["Workouts"])
+app.include_router(members.router, prefix="/v2/members", tags=["Members"])
 
 
 @app.exception_handler(HTTPException)
