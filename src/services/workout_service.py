@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
 import calendar
 import datetime
 from sqlalchemy import text
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
 from src.models.schemas import AOSummary, MemberSummary, WorkoutResponse
@@ -343,7 +346,7 @@ class WorkoutService:
         return workout
 
     @staticmethod
-    def _map_row_to_workout(row: dict) -> WorkoutResponse:
+    def _map_row_to_workout(row: RowMapping | Mapping[Any, Any]) -> WorkoutResponse:
         """Map raw database row mapping to strongly-typed WorkoutResponse DTO."""
         # Parse AO associations
         ao_list: list[AOSummary] = []
