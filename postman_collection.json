@@ -520,7 +520,7 @@
       "name": "5. Self-Service & Admin (Phase 5)",
       "item": [
         {
-          "name": "Ingest / Scrape New Backblast Workout",
+          "name": "Add Workout with Data",
           "request": {
             "method": "POST",
             "header": [
@@ -531,32 +531,36 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://f3rva.org/2026/08/07/beatdown-at-gridiron\"\n}"
+              "raw": "{\n  \"title\": \"Beatdown at First Watch\",\n  \"workoutDate\": \"2026-08-07\",\n  \"qic\": \"Dingo, Lab Rat\",\n  \"pax\": \"Dingo, Lab Rat, Splinter, Swag\",\n  \"aos\": [\n    {\n      \"name\": \"First Watch\",\n      \"slug\": \"first-watch\"\n    },\n    {\n      \"name\": \"Spider Run\",\n      \"slug\": \"spider-run\"\n    }\n  ],\n  \"body\": \"<p>100 burpees and 5 miles.</p>\",\n  \"url\": \"https://f3rva.org/2026/08/07/beatdown-at-first-watch\",\n  \"author\": \"Dingo\",\n  \"slug\": \"beatdown-at-first-watch\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/workouts",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "workouts"]
             },
-            "description": "Scrapes a backblast URL and inserts the workout, AOs, Qs, and PAX attendees into the database."
+            "description": "Creates a new workout directly from structured payload data (title, workoutDate, qic, pax, aos, body, url, author, slug)."
           }
         },
         {
-          "name": "Refresh / Re-scrape Existing Workout",
+          "name": "Delete Workout (Admin)",
           "request": {
-            "method": "POST",
+            "method": "DELETE",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
               {
                 "key": "Accept",
                 "value": "application/json"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/101/refresh",
+              "raw": "{{baseUrl}}/v2/workouts/101",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "workouts", "101", "refresh"]
+              "path": ["v2", "workouts", "101"]
             },
-            "description": "Re-scrapes the backblast URL for an existing workout and updates all attendees, Qs, and content."
+            "description": "Deletes a workout and all associated attendee, leader, AO, and detail records (Requires Bearer Token)."
           }
         },
         {
@@ -583,6 +587,21 @@
         },
         {
           "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.accessToken) {",
+                  "    pm.collectionVariables.set('authToken', jsonData.accessToken);",
+                  "    console.log('JWT Bearer token saved to collection variable {{authToken}}');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -593,14 +612,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"password\": \"your-admin-password\"\n}"
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/admin/login",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "admin", "login"]
             },
-            "description": "Authenticates the admin and returns a signed 24h JWT bearer token."
+            "description": "Authenticates the admin and automatically saves the signed 24h JWT bearer token into the {{authToken}} collection variable."
           }
         },
         {
@@ -640,11 +659,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/approve/1",
+              "raw": "{{baseUrl}}/v2/admin/aliases/approve/1/2",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "admin", "aliases", "approve", "1"]
+              "path": ["v2", "admin", "aliases", "approve", "1", "2"]
             },
-            "description": "Approves an alias request, merges attendance records, and deletes the duplicate member record."
+            "description": "Approves an alias request (primaryMemberId/aliasMemberId), merges attendance records, and deletes the duplicate member record."
           }
         },
         {
@@ -662,11 +681,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/reject/1",
+              "raw": "{{baseUrl}}/v2/admin/aliases/reject/1/2",
               "host": ["{{baseUrl}}"],
-              "path": ["v2", "admin", "aliases", "reject", "1"]
+              "path": ["v2", "admin", "aliases", "reject", "1", "2"]
             },
-            "description": "Rejects a pending alias request."
+            "description": "Rejects a pending alias request (primaryMemberId/aliasMemberId)."
           }
         }
       ]

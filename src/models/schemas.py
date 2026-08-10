@@ -146,6 +146,89 @@ class MemberDistributionResponse(BaseModel):
     distribution: list[MemberAODistribution] = Field(default_factory=list, description="AO attendance breakdown")
 
 
+# ==========================================
+# Phase 5: Mutation & Admin Schemas
+# ==========================================
+
+
+class AOInput(BaseModel):
+    """Area of Operations input specification."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, populate_by_name=True)
+
+    name: str = Field(..., min_length=1, description="AO description/name (e.g. 'First Watch')")
+    slug: str | None = Field(None, description="AO URL slug (e.g. 'first-watch')")
+
+
+class AddWorkoutRequest(BaseModel):
+    """Structured payload to add a workout directly with data."""
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    title: str = Field(..., min_length=1, description="Workout title")
+    workout_date: str = Field(..., alias="workoutDate", description="Workout date (YYYY-MM-DD, YYYYMMDD, or MM/DD/YYYY)")
+    qic: str | list[str] = Field(..., description="Workout leader(s) (Qs) as comma-separated string or list of names")
+    pax: str | list[str] = Field(..., description="Workout attendees (PAX) as comma-separated string or list of names")
+    aos: list[AOInput] = Field(..., min_length=1, description="AOs where workout was hosted (list of objects with 'name' and optional 'slug')")
+    url: str | None = Field(None, description="Backblast URL")
+    author: str | None = Field(None, description="Backblast author")
+    slug: str | None = Field(None, description="URL slug")
+    body: str | None = Field(None, description="HTML or plain text backblast body")
+
+
+class WorkoutCreatedResponse(BaseModel):
+    """Response returned after creating a workout."""
+
+    id: int = Field(..., description="Unique ID of the newly created workout")
+
+
+class DeleteWorkoutResponse(BaseModel):
+    """Response returned after deleting a workout."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str = Field(..., description="Confirmation message")
+    workout_id: int = Field(..., alias="workoutId", serialization_alias="workoutId", description="Deleted workout ID")
+
+
+class AliasClaimRequest(BaseModel):
+    """Request payload to submit a member alias claim."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    primary_member_id: int = Field(..., alias="primaryMemberId", description="ID of the primary/surviving member")
+    alias_member_id: int = Field(..., alias="aliasMemberId", description="ID of the duplicate member record to alias and merge")
+
+
+class AliasRequestResponse(BaseModel):
+    """Response DTO for an alias request."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    primary_member: MemberSummary = Field(..., alias="primaryMember", serialization_alias="primaryMember")
+    alias_member: MemberSummary = Field(..., alias="aliasMember", serialization_alias="aliasMember")
+    status: str = Field(..., description="Request status (pending, approved, rejected)")
+
+
+class AdminLoginRequest(BaseModel):
+    """Admin login credentials."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    username: str = Field(default="admin", description="Admin username")
+    password: str = Field(..., description="Admin password")
+
+
+class TokenResponse(BaseModel):
+    """JWT Access Token response."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    access_token: str = Field(..., alias="accessToken", serialization_alias="accessToken")
+    token_type: str = Field(default="bearer", alias="tokenType", serialization_alias="tokenType")
+    expires_in: int = Field(default=86400, alias="expiresIn", serialization_alias="expiresIn")
+
+
 class ErrorResponse(BaseModel):
     """Standard error response matching legacy PHP JSON structure."""
 

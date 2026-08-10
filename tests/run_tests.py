@@ -1,4 +1,4 @@
-"""Standalone test runner for verifying Phase 1, Phase 2, Phase 3, and Phase 4 components."""
+"""Standalone test runner for verifying Phase 1 through Phase 5 components."""
 
 from __future__ import annotations
 
@@ -23,6 +23,21 @@ from sqlalchemy.pool import StaticPool
 
 from src.config.database import Base, get_db
 from src.main import app
+from tests.test_admin import (
+    seed_admin_test_data,
+    test_admin_login_invalid_credentials,
+    test_admin_login_success,
+    test_approve_alias_request_merges_records,
+    test_get_pending_alias_requests_unauthorized_without_token,
+    test_get_pending_alias_requests_with_jwt,
+    test_jwt_expired_token_rejected,
+    test_jwt_invalid_token_rejected,
+    test_reject_alias_request,
+    test_submit_alias_claim_request_duplicate_conflict,
+    test_submit_alias_claim_request_same_member_rejected,
+    test_submit_alias_claim_request_success,
+    test_submit_alias_claim_request_unknown_member,
+)
 from tests.test_database import (
     test_get_db_generator_lifecycle,
     test_get_engine_singleton,
@@ -57,13 +72,13 @@ from tests.test_members import (
 )
 from tests.test_reports import (
     seed_test_report_data,
+    test_get_ao_attendance_summary,
+    test_get_ao_leaderboard_not_found_404,
+    test_get_ao_leaderboard_with_streakers,
     test_get_attendance_leaderboard_date_range_filter,
     test_get_attendance_leaderboard_default_sorting,
     test_get_attendance_leaderboard_sorted_by_q,
     test_get_attendance_leaderboard_sorted_by_ratio,
-    test_get_ao_attendance_summary,
-    test_get_ao_leaderboard_not_found_404,
-    test_get_ao_leaderboard_with_streakers,
     test_get_day_of_week_attendance,
     test_get_member_distribution_not_found_404,
     test_get_member_distribution_success,
@@ -71,6 +86,17 @@ from tests.test_reports import (
 from tests.test_utils import (
     test_timed_service_exception_logging,
     test_timed_service_success,
+)
+from tests.test_workout_mutations import (
+    test_add_workout_date_formats,
+    test_add_workout_future_date_rejected,
+    test_add_workout_invalid_date_rejected,
+    test_add_workout_missing_required_entities_rejected,
+    test_add_workout_with_delimited_strings,
+    test_add_workout_with_list_inputs,
+    test_delete_workout_not_found_404,
+    test_delete_workout_success_with_bearer_token,
+    test_delete_workout_unauthorized_without_token,
 )
 from tests.test_workouts import (
     seed_test_workout_data,
@@ -88,7 +114,7 @@ from tests.test_workouts import (
 
 
 def run_all_tests():
-    print("🧪 Running Phase 1, Phase 2, Phase 3 & Phase 4 Test Suite...\n")
+    print("🧪 Running Phase 1 through Phase 5 Complete Test Suite...\n")
 
     # 1. Database & Settings Lifecycle Tests
     test_get_engine_singleton()
@@ -140,7 +166,7 @@ def run_all_tests():
         test_mangum_lambda_handler()
         print("  ✅ Phase 1: System Health, Exceptions & Docs Tests (10/10 passed)")
 
-        # Phase 2: Workouts & Backblasts Tests
+        # Phase 2: Workouts & Backblasts Read Tests
         test_get_recent_workouts(client, db_w)
         test_get_workouts_pagination_empty(client, db_w)
         test_get_workouts_by_year(client, db_w)
@@ -152,6 +178,18 @@ def run_all_tests():
         test_get_workouts_by_ao_id_and_slug(client, db_w)
         test_workout_not_found_404(client, db_w)
         print("  ✅ Phase 2: Workouts & Backblasts Endpoints (10/10 passed)")
+
+        # Phase 5 (Part A): Structured Workout Additions & Protected Deletions
+        test_add_workout_with_delimited_strings(client, db_w)
+        test_add_workout_with_list_inputs(client, db_w)
+        test_add_workout_date_formats(client, db_w)
+        test_add_workout_invalid_date_rejected(client)
+        test_add_workout_future_date_rejected(client)
+        test_add_workout_missing_required_entities_rejected(client)
+        test_delete_workout_success_with_bearer_token(client, db_w)
+        test_delete_workout_unauthorized_without_token(client)
+        test_delete_workout_not_found_404(client)
+        print("  ✅ Phase 5 (A): Structured Add & Protected Delete Workout Endpoints (9/9 passed)")
 
     app.dependency_overrides.clear()
     db_w.close()
@@ -232,7 +270,46 @@ def run_all_tests():
     Base.metadata.drop_all(bind=engine_r)
     engine_r.dispose()
 
-    print("\n🎉 ALL 47 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
+    # Set up in-memory test database for Admin & Aliases
+    engine_a = create_engine(
+        os.environ["DATABASE_URL"],
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine_a)
+    session_factory_a = sessionmaker(bind=engine_a, autocommit=False, autoflush=False)
+    db_a = session_factory_a()
+
+    def override_get_db_a():
+        try:
+            yield db_a
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db_a
+
+    with TestClient(app) as client:
+        # Phase 5 (Part B): Admin & Aliases Tests
+        test_admin_login_success(client)
+        test_admin_login_invalid_credentials(client)
+        test_submit_alias_claim_request_success(client, db_a)
+        test_submit_alias_claim_request_same_member_rejected(client, db_a)
+        test_submit_alias_claim_request_unknown_member(client, db_a)
+        test_submit_alias_claim_request_duplicate_conflict(client, db_a)
+        test_get_pending_alias_requests_unauthorized_without_token(client)
+        test_get_pending_alias_requests_with_jwt(client, db_a)
+        test_approve_alias_request_merges_records(client, db_a)
+        test_reject_alias_request(client, db_a)
+        test_jwt_expired_token_rejected(client)
+        test_jwt_invalid_token_rejected(client)
+        print("  ✅ Phase 5 (B): Admin Auth, JWT & Alias Workflows (12/12 passed)")
+
+    app.dependency_overrides.clear()
+    db_a.close()
+    Base.metadata.drop_all(bind=engine_a)
+    engine_a.dispose()
+
+    print("\n🎉 ALL 68 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
 
 
 if __name__ == "__main__":

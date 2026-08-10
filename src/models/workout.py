@@ -1,10 +1,10 @@
-"""SQLAlchemy ORM Data Models for Workouts, AOs, and PAX."""
+"""SQLAlchemy ORM Data Models for Workouts, AOs, PAX, and Alias Requests."""
 
 from __future__ import annotations
 
 import datetime
 from sqlalchemy import Date, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from src.config.database import Base
 
@@ -39,6 +39,34 @@ class MemberAlias(Base):
         "MEMBER_ID", Integer, ForeignKey("MEMBER.MEMBER_ID"), primary_key=True
     )
     f3_alias: Mapped[str] = mapped_column("F3_ALIAS", String(255), primary_key=True)
+
+
+class MemberAliasRequest(Base):
+    """Member Alias Claim Request entity using composite primary key (PRIMARY_ID, ALIAS_ID)."""
+
+    __tablename__ = "MEMBER_ALIAS_REQUEST"
+
+    primary_id: Mapped[int] = mapped_column(
+        "PRIMARY_ID", Integer, ForeignKey("MEMBER.MEMBER_ID"), primary_key=True
+    )
+    alias_id: Mapped[int] = mapped_column(
+        "ALIAS_ID", Integer, ForeignKey("MEMBER.MEMBER_ID"), primary_key=True
+    )
+    status: Mapped[str] = mapped_column("STATUS", String(32), default="pending", nullable=False)
+
+
+class MemberAliasAudit(Base):
+    """Audit trail for merged member records."""
+
+    __tablename__ = "MEMBER_ALIAS_AUDIT"
+
+    audit_id: Mapped[int] = mapped_column(
+        "AUDIT_ID", Integer, primary_key=True, autoincrement=True
+    )
+    old_member_id: Mapped[int] = mapped_column("OLD_MEMBER_ID", Integer, nullable=False)
+    old_f3_name: Mapped[str] = mapped_column("OLD_F3_NAME", String(255), nullable=False)
+    workout_id: Mapped[int] = mapped_column("WORKOUT_ID", Integer, nullable=False)
+    member_type: Mapped[str] = mapped_column("MEMBER_TYPE", String(32), nullable=False)
 
 
 class Workout(Base):

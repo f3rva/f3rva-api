@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     db_pool_recycle: int = Field(default=300, description="Connection recycle duration in seconds")
     db_connect_args: dict[str, Any] = Field(default_factory=dict, description="Custom database engine connection arguments")
 
+    # Security & Admin Authentication
+    jwt_secret_key: str = Field(
+        default="change-me-in-production-jwt-secret-key-32-chars",
+        description="JWT secret key for signing admin authentication tokens",
+    )
+    admin_username: str = Field(default="admin", description="Admin username for management endpoints")
+    admin_password: str = Field(default="admin", description="Admin password for management endpoints")
+
 
 @lru_cache
 def get_settings() -> Settings:
