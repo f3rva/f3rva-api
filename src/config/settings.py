@@ -1,15 +1,15 @@
-"""Application Settings & Environment Configuration."""
+"""Application Settings & 12-Factor Environment Configuration."""
 
 from __future__ import annotations
 
 from functools import lru_cache
-import os
+from typing import Any
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
-    """Application settings for local development and runtime configuration."""
+    """Application settings strictly externalized via environment variables (zero hardcoded values)."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -17,50 +17,18 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Core Application
-    app_name: str = "F3 RVA API"
-    app_version: str = "0.1.0"
-    environment: str = "development"
-    debug: bool = False
-    port: int = 8000
+    # Core Application Configuration (Provided via .env / environment)
+    app_name: str = Field(..., description="Application name displayed in OpenAPI and logs")
+    app_version: str = Field(..., description="Fallback application version")
+    environment: str = Field(..., description="Runtime environment name (development, testing, production)")
+    debug: bool = Field(default=False, description="Debug mode flag")
+    port: int = Field(..., description="Server listen port")
 
-    # Database Configuration (Existing Remote MySQL Host)
-    db_host: str | None = None
-    db_port: int = 3306
-    db_user: str | None = None
-    db_pass: str | None = None
-    db_name: str = "f3rva_bd"
-    db_pool_size: int = 5
-    db_max_overflow: int = 2
-    db_pool_recycle: int = 300
-    db_pool_timeout: int = 10
-    database_url_override: str | None = None
-
-    def get_database_url_object(self) -> URL | str:
-        """Construct a secure SQLAlchemy URL object handling special characters safely."""
-        if self.database_url_override:
-            return self.database_url_override
-
-        host = self.db_host or os.getenv("DB_HOST")
-        user = self.db_user or os.getenv("DB_USER")
-        password = self.db_pass or os.getenv("DB_PASS")
-        database = self.db_name or os.getenv("DB_NAME", "f3rva_bd")
-        port = self.db_port or int(os.getenv("DB_PORT", "3306"))
-
-        if host and user and password:
-            # Use URL.create to safely escape special characters in passwords and prevent leakage
-            return URL.create(
-                drivername="mysql+pymysql",
-                username=user,
-                password=password,
-                host=host,
-                port=port,
-                database=database,
-                query={"charset": "utf8mb4"},
-            )
-
-        # Fallback to local SQLite in-memory for testing if no DB configured
-        return "sqlite:///:memory:"
+    # 12-Factor Database Configuration (Provided via .env / environment)
+    database_url: str = Field(..., description="Full database connection URL")
+    db_pool_pre_ping: bool = Field(default=True, description="Enable connection pre-ping")
+    db_pool_recycle: int = Field(default=300, description="Connection recycle duration in seconds")
+    db_connect_args: dict[str, Any] = Field(default_factory=dict, description="Custom database engine connection arguments")
 
 
 @lru_cache

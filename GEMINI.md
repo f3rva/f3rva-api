@@ -131,6 +131,12 @@ AI agents MUST adhere unconditionally to the **OWASP API Security Top 10** stand
 2. **Strict Python 3.13 Typing**:
    * Use built-in generic types (`list[T]`, `dict[K, V]`, `str | None`).
    * Use `Annotated` for all FastAPI dependencies.
-3. **Deterministic Pytest Suite**:
+3. **Mandatory 80%+ Test Coverage (`--cov-fail-under=80`)**:
+   * Every new service, router, and model component **MUST** maintain at least 80% unit test coverage.
+   * Pull requests and CI builds failing the 80% threshold will automatically be rejected.
+4. **Deterministic Pytest Suite**:
    * Every router and service component must have a corresponding test suite in `tests/`.
    * Tests run against in-memory SQLite fixtures (`tests/conftest.py`) without requiring live network access.
+5. **Service Latency & Debug Logging (`@timed_service`)**:
+   * Every business service method in `src/services/` **MUST** be decorated with `@timed_service` from `src.utils.logging`.
+   * Emits structured `START` and `END` debug logs with high-resolution duration in milliseconds (`%.2fms`) for latency troubleshooting in CloudWatch and local development.

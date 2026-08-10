@@ -21,28 +21,16 @@ _SessionLocal = None
 
 
 def get_engine():
-    """Create or return the global SQLAlchemy engine with connection pooling."""
+    """Create or return the global SQLAlchemy engine from the externalized DATABASE_URL with zero dialect checks."""
     global _engine
     if _engine is None:
         settings = get_settings()
-        db_url_obj = settings.get_database_url_object()
-
-        if isinstance(db_url_obj, str) and db_url_obj.startswith("sqlite"):
-            _engine = create_engine(
-                db_url_obj,
-                connect_args={"check_same_thread": False},
-                pool_pre_ping=True,
-            )
-        else:
-            # PyMySQL / Remote MySQL Pool using safely constructed URL object
-            _engine = create_engine(
-                db_url_obj,
-                pool_size=settings.db_pool_size,
-                max_overflow=settings.db_max_overflow,
-                pool_recycle=settings.db_pool_recycle,
-                pool_timeout=settings.db_pool_timeout,
-                pool_pre_ping=True,  # Automatically reconnect dropped MySQL connections
-            )
+        _engine = create_engine(
+            settings.database_url,
+            pool_pre_ping=settings.db_pool_pre_ping,
+            pool_recycle=settings.db_pool_recycle,
+            connect_args=settings.db_connect_args,
+        )
     return _engine
 
 

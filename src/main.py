@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Annotated, Any
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,10 +15,22 @@ from sqlalchemy.orm import Session
 from src.config.database import get_db
 from src.config.settings import get_settings
 from src.config.version import get_version
+from src.routers import workouts
 
-logger = logging.getLogger("f3rva-api")
 settings = get_settings()
 APP_VERSION = get_version()
+
+# Configure global structured logging based on DEBUG environment flag
+log_level = logging.DEBUG if settings.debug else logging.INFO
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+    force=True,
+)
+logging.getLogger("f3rva").setLevel(log_level)
+logging.getLogger("f3rva.services").setLevel(log_level)
+logger = logging.getLogger("f3rva-api")
 
 app = FastAPI(
     title=settings.app_name,
@@ -47,6 +60,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Mount Domain Routers
+app.include_router(workouts.router, prefix="/v2/workouts", tags=["Workouts"])
+
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """Format HTTP exceptions into structured JSON matching legacy contract."""
+    if isinstance(exc.detail, dict):
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"errorCode": exc.status_code, "errorMessage": str(exc.detail)},
+    )
 
 
 @app.exception_handler(Exception)
@@ -94,27 +121,31 @@ def health_check() -> dict[str, Any]:
 def health_check_db(
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, Any]:
-    """Verify live database connectivity with sanitized error responses (no credential leakage)."""
+    """Verify live database connectivity and report active engine dialect from SQLAlchemy metadata."""
     try:
         result = db.execute(text("SELECT 1")).scalar()
         if result == 1:
+            dialect = db.bind.dialect.name if db.bind else "unknown"
             return {
                 "status": "healthy",
                 "database": "connected",
+                "dialect": dialect,
                 "version": APP_VERSION,
             }
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database returned unexpected response.",
+            detail={"errorCode": 5031, "errorMessage": "Database returned unexpected response."},
         )
     except HTTPException:
         raise
     except Exception as exc:
         logger.error("Database connection failure: %s", exc)
-        # Never leak raw connection strings or passwords in HTTP error responses
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database connection failed. Unable to establish connection to the remote database host.",
+            detail={
+                "errorCode": 5030,
+                "errorMessage": "Database connection failed. Unable to establish connection to the remote database host.",
+            },
         ) from None
 
 

@@ -98,11 +98,13 @@ python -m uvicorn src.main:app --reload --port 8000
 
 ## 4. Running Tests & Quality Checks
 
+The repository enforces a **strict minimum of 80% test coverage** via `pytest-cov` (`--cov-fail-under=80`). Any build or pull request falling below this threshold will automatically fail.
+
 ```bash
-# Run all unit and integration tests
+# Run all unit and integration tests with coverage enforcement (>= 80%)
 pytest
 
-# Run tests with verbose output and coverage report
+# Run tests with verbose per-file line-by-line coverage report
 pytest -v --cov=src --cov-report=term-missing
 
 # Run linting with Ruff
