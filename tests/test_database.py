@@ -79,3 +79,47 @@ def test_get_version_branches() -> None:
     with patch("subprocess.check_output", side_effect=Exception("no git")):
         with patch("importlib.metadata.version", side_effect=importlib.metadata.PackageNotFoundError):
             assert get_version() == "0.1.0"
+
+
+def test_fetch_ssm_parameters_in_aws() -> None:
+    """Verify _fetch_ssm_parameters fetches and maps parameters from AWS SSM Parameter Store."""
+    from src.config.settings import _fetch_ssm_parameters
+    from unittest.mock import MagicMock
+
+    mock_paginator = MagicMock()
+    mock_paginator.paginate.return_value = [
+        {
+            "Parameters": [
+                {"Name": "/f3rva/dev/database_url", "Value": "mysql+pymysql://user:pass@db.f3rva.org/f3rva_bd"},
+                {"Name": "/f3rva/dev/jwt_secret_key", "Value": "ssm-secret-key-32-chars-long"},
+                {"Name": "/f3rva/dev/f3nation_api_key", "Value": "ssm-f3nation-key-123"},
+            ]
+        }
+    ]
+    mock_ssm = MagicMock()
+    mock_ssm.get_paginator.return_value = mock_paginator
+
+    with patch("os.getenv", side_effect=lambda k, default="": {
+        "ENVIRONMENT": "development",
+        "AWS_LAMBDA_FUNCTION_NAME": "f3rva-dev-api-lambda",
+        "AWS_REGION": "us-east-1"
+    }.get(k, default)):
+        with patch("boto3.client", return_value=mock_ssm):
+            params = _fetch_ssm_parameters("dev")
+            assert params["database_url"] == "mysql+pymysql://user:pass@db.f3rva.org/f3rva_bd"
+            assert params["jwt_secret_key"] == "ssm-secret-key-32-chars-long"
+            assert params["f3_nation_api_key"] == "ssm-f3nation-key-123"
+
+
+def test_fetch_ssm_parameters_error_graceful_fallback() -> None:
+    """Verify _fetch_ssm_parameters returns empty dict gracefully on exception."""
+    from src.config.settings import _fetch_ssm_parameters
+
+    with patch("os.getenv", side_effect=lambda k, default="": {
+        "ENVIRONMENT": "development",
+        "ENABLE_SSM": "true"
+    }.get(k, default)):
+        with patch("boto3.client", side_effect=Exception("SSM client failure")):
+            params = _fetch_ssm_parameters("dev")
+            assert params == {}
+
