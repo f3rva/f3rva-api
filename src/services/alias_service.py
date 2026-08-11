@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from src.models.schemas import AliasRequestResponse, MemberSummary
+from src.models.schemas import AliasClaimRequest, AliasRequestResponse, MemberSummary
 from src.models.workout import Member, MemberAlias, MemberAliasAudit, MemberAliasRequest
 from src.utils.logging import timed_service
 
@@ -68,7 +68,7 @@ class AliasService:
     @classmethod
     @timed_service
     def get_pending_requests(cls, db: Session) -> list[AliasRequestResponse]:
-        """Retrieve all pending alias requests for admin review matching MySQL MEMBER_ALIAS_REQUEST schema."""
+        """Retrieve all pending alias requests matching MySQL MEMBER_ALIAS_REQUEST schema."""
         query = text(
             """
             SELECT
@@ -115,13 +115,44 @@ class AliasService:
                 detail={"errorCode": 2006, "errorMessage": f"Alias request is already {req.status}."},
             )
 
+        res = cls._execute_member_merge(db=db, primary_id=primary_id, alias_id=alias_id)
+        req.status = "approved"
+        db.commit()
+        return res
+
+    @classmethod
+    @timed_service
+    def direct_merge(cls, db: Session, primary_id: int, alias_id: int) -> AliasRequestResponse:
+        """Directly merge two members by an admin without requiring a prior pending request."""
+        res = cls._execute_member_merge(db=db, primary_id=primary_id, alias_id=alias_id)
+        # If a pending request happened to exist for them, mark it approved
+        req = db.execute(
+            select(MemberAliasRequest).where(
+                MemberAliasRequest.primary_id == primary_id,
+                MemberAliasRequest.alias_id == alias_id,
+            )
+        ).scalar_one_or_none()
+        if req:
+            req.status = "approved"
+        db.commit()
+        return res
+
+    @classmethod
+    def _execute_member_merge(cls, db: Session, primary_id: int, alias_id: int) -> AliasRequestResponse:
+        """Internal helper to atomically merge attendance records, generate audit trails, and delete duplicate member."""
+        if primary_id == alias_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"errorCode": 2003, "errorMessage": "Primary member and alias member cannot be the same."},
+            )
+
         primary = db.execute(select(Member).where(Member.member_id == primary_id)).scalar_one_or_none()
         alias_member = db.execute(select(Member).where(Member.member_id == alias_id)).scalar_one_or_none()
 
         if not primary or not alias_member:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail={"errorCode": 2001, "errorMessage": "One or more members in this request no longer exist."},
+                detail={"errorCode": 2001, "errorMessage": "One or more members in this merge request do not exist."},
             )
 
         alias_name = alias_member.f3_name
@@ -204,13 +235,9 @@ class AliasService:
         if not existing_alias_map:
             db.add(MemberAlias(member_id=primary_id, f3_alias=alias_name))
 
-        # 6. Update request status to approved
-        req.status = "approved"
-
-        # 7. Delete the duplicate member entity
+        # 6. Delete the duplicate member entity
         db.delete(alias_member)
-
-        db.commit()
+        db.flush()
 
         return AliasRequestResponse(
             primaryMember=MemberSummary(memberId=primary.member_id, f3Name=primary.f3_name),

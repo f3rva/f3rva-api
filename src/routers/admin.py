@@ -11,6 +11,7 @@ from src.config.database import get_db
 from src.config.settings import get_settings
 from src.models.schemas import (
     AdminLoginRequest,
+    AliasClaimRequest,
     AliasRequestResponse,
     ErrorResponse,
     TokenResponse,
@@ -116,4 +117,29 @@ def reject_alias_request(
     """Reject a pending alias request."""
     return AliasService.reject_alias(
         db=db, primary_id=primary_member_id, alias_id=alias_member_id
+    )
+
+
+@router.post(
+    "/members/merge",
+    response_model=AliasRequestResponse,
+    summary="Directly merge two members (Admin)",
+    description="Directly merges a duplicate member record into a primary member, creates audit trails, updates aliases, and reassigns attendance (Requires Bearer Token).",
+    responses={
+        200: {"description": "Members merged successfully."},
+        400: {"model": ErrorResponse, "description": "Cannot merge identical members."},
+        401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
+        404: {"model": ErrorResponse, "description": "One or more members not found."},
+    },
+)
+def direct_merge_members(
+    db: DbSession,
+    payload: AliasClaimRequest,
+    current_admin: Annotated[str, Depends(get_current_admin)],
+) -> AliasRequestResponse:
+    """Directly merge two member entities."""
+    return AliasService.direct_merge(
+        db=db,
+        primary_id=payload.primary_member_id,
+        alias_id=payload.alias_member_id,
     )

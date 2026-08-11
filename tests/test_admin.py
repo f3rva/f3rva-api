@@ -121,6 +121,18 @@ def test_submit_alias_claim_request_duplicate_conflict(client: TestClient, db_se
     assert r2.json()["errorCode"] == 2004
 
 
+def test_get_public_pending_alias_requests(client: TestClient, db_session: Session) -> None:
+    """Verify public GET /v2/aliases/requests returns pending requests without token."""
+    seed_admin_test_data(db_session)
+    client.post("/v2/aliases/request", json={"primaryMemberId": 1, "aliasMemberId": 2})
+
+    response = client.get("/v2/aliases/requests")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["primaryMember"]["f3Name"] == "Dingo"
+
+
 def test_get_pending_alias_requests_unauthorized_without_token(client: TestClient) -> None:
     """Verify GET /v2/admin/aliases/requests rejects requests without authorization token."""
     response = client.get("/v2/admin/aliases/requests")
@@ -169,11 +181,9 @@ def test_approve_alias_request_merges_records(client: TestClient, db_session: Se
     assert len(audit_entries) > 0
 
     # Verify workout attendance was merged
-    # w2 (402) attendance reassigned to Dingo (id=1)
     w2_pax = db_session.query(WorkoutPax).filter(WorkoutPax.workout_id == 402, WorkoutPax.member_id == 1).first()
     assert w2_pax is not None
 
-    # w3 (403) Q reassigned to Dingo (id=1)
     w3_q = db_session.query(WorkoutQ).filter(WorkoutQ.workout_id == 403, WorkoutQ.member_id == 1).first()
     assert w3_q is not None
 
@@ -190,6 +200,23 @@ def test_reject_alias_request(client: TestClient, db_session: Session) -> None:
     )
     assert reject_res.status_code == 200
     assert reject_res.json()["status"] == "rejected"
+
+
+def test_direct_merge_members(client: TestClient, db_session: Session) -> None:
+    """Verify POST /v2/admin/members/merge merges members directly without requiring prior request."""
+    seed_admin_test_data(db_session)
+
+    token = create_access_token(data={"sub": "admin"})
+    merge_res = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert merge_res.status_code == 200
+    assert merge_res.json()["status"] == "approved"
+
+    # Verify duplicate member 2 deleted
+    assert db_session.query(Member).filter(Member.member_id == 2).first() is None
 
 
 def test_jwt_expired_token_rejected(client: TestClient) -> None:

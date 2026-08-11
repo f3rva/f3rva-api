@@ -586,6 +586,24 @@
           }
         },
         {
+          "name": "Get Pending Alias Requests (Public)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/aliases/requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "aliases", "requests"]
+            },
+            "description": "Retrieves public list of pending member alias requests for the self-service page."
+          }
+        },
+        {
           "name": "Admin Login",
           "event": [
             {
@@ -686,6 +704,32 @@
               "path": ["v2", "admin", "aliases", "reject", "1", "2"]
             },
             "description": "Rejects a pending alias request (primaryMemberId/aliasMemberId)."
+          }
+        },
+        {
+          "name": "Direct Merge Members (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryMemberId\": 1,\n  \"aliasMemberId\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/admin/members/merge",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "admin", "members", "merge"]
+            },
+            "description": "Directly merges a duplicate member into a primary member without requiring a prior pending request (Admin only)."
           }
         }
       ]

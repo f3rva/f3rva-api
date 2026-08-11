@@ -28,8 +28,10 @@ from tests.test_admin import (
     test_admin_login_invalid_credentials,
     test_admin_login_success,
     test_approve_alias_request_merges_records,
+    test_direct_merge_members,
     test_get_pending_alias_requests_unauthorized_without_token,
     test_get_pending_alias_requests_with_jwt,
+    test_get_public_pending_alias_requests,
     test_jwt_expired_token_rejected,
     test_jwt_invalid_token_rejected,
     test_reject_alias_request,
@@ -92,7 +94,7 @@ from tests.test_workout_mutations import (
     test_add_workout_future_date_rejected,
     test_add_workout_invalid_date_rejected,
     test_add_workout_missing_required_entities_rejected,
-    test_add_workout_with_delimited_strings,
+    test_add_workout_with_aos_objects,
     test_add_workout_with_list_inputs,
     test_delete_workout_not_found_404,
     test_delete_workout_success_with_bearer_token,
@@ -180,7 +182,7 @@ def run_all_tests():
         print("  ✅ Phase 2: Workouts & Backblasts Endpoints (10/10 passed)")
 
         # Phase 5 (Part A): Structured Workout Additions & Protected Deletions
-        test_add_workout_with_delimited_strings(client, db_w)
+        test_add_workout_with_aos_objects(client, db_w)
         test_add_workout_with_list_inputs(client, db_w)
         test_add_workout_date_formats(client, db_w)
         test_add_workout_invalid_date_rejected(client)
@@ -296,20 +298,22 @@ def run_all_tests():
         test_submit_alias_claim_request_same_member_rejected(client, db_a)
         test_submit_alias_claim_request_unknown_member(client, db_a)
         test_submit_alias_claim_request_duplicate_conflict(client, db_a)
+        test_get_public_pending_alias_requests(client, db_a)
         test_get_pending_alias_requests_unauthorized_without_token(client)
         test_get_pending_alias_requests_with_jwt(client, db_a)
         test_approve_alias_request_merges_records(client, db_a)
         test_reject_alias_request(client, db_a)
+        test_direct_merge_members(client, db_a)
         test_jwt_expired_token_rejected(client)
         test_jwt_invalid_token_rejected(client)
-        print("  ✅ Phase 5 (B): Admin Auth, JWT & Alias Workflows (12/12 passed)")
+        print("  ✅ Phase 5 (B): Admin Auth, JWT & Alias Workflows (14/14 passed)")
 
     app.dependency_overrides.clear()
     db_a.close()
     Base.metadata.drop_all(bind=engine_a)
     engine_a.dispose()
 
-    print("\n🎉 ALL 68 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
+    print("\n🎉 ALL 70 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
 
 
 if __name__ == "__main__":

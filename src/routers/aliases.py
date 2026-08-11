@@ -38,3 +38,19 @@ def request_alias(
         primary_id=payload.primary_member_id,
         alias_id=payload.alias_member_id,
     )
+
+
+@router.get(
+    "/requests",
+    response_model=list[AliasRequestResponse],
+    summary="Get pending alias requests (Public)",
+    description="Retrieves all currently pending member alias requests to display on the self-service page.",
+    responses={
+        200: {"description": "List of pending alias requests."},
+    },
+)
+def get_public_pending_alias_requests(
+    db: DbSession,
+) -> list[AliasRequestResponse]:
+    """Retrieve public list of pending alias claim requests."""
+    return AliasService.get_pending_requests(db=db)
