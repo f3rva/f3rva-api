@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 import jwt
 from sqlalchemy.orm import Session
 
+from src.config.database import Base
 from src.config.settings import get_settings
 from src.models.workout import AO, Member, MemberAlias, MemberAliasAudit, Workout, WorkoutAO, WorkoutPax, WorkoutQ
 from src.utils.security import create_access_token
@@ -14,6 +15,8 @@ from src.utils.security import create_access_token
 
 def seed_admin_test_data(db: Session) -> dict[str, int]:
     """Helper fixture to insert mock members, workouts, and attendances for alias merging."""
+    Base.metadata.drop_all(bind=db.get_bind())
+    Base.metadata.create_all(bind=db.get_bind())
     # 1. Members (Primary: Dingo (id=1), Duplicate to merge: Wild Dingo (id=2), Third: Lab Rat (id=3))
     m1 = Member(member_id=1, f3_name="Dingo")
     m2 = Member(member_id=2, f3_name="Wild Dingo")

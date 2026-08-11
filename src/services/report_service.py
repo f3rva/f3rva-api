@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from src.models.schemas import (
@@ -14,6 +14,7 @@ from src.models.schemas import (
     LeaderboardEntry,
     MemberAODistribution,
     MemberDistributionResponse,
+    StreakerEntry,
 )
 from src.utils.logging import timed_service
 
@@ -369,9 +370,9 @@ class ReportService:
             INNER JOIN MEMBER m ON wp.MEMBER_ID = m.MEMBER_ID
             WHERE wp.WORKOUT_ID IN :workout_ids
             """
-        )
+        ).bindparams(bindparam("workout_ids", expanding=True))
         pax_rows = (
-            db.execute(pax_query, {"workout_ids": tuple(workout_ids)}).mappings().all()
+            db.execute(pax_query, {"workout_ids": list(workout_ids)}).mappings().all()
         )
 
         # Build map: workout_id -> set of member_ids and member_id -> name

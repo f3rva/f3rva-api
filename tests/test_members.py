@@ -6,11 +6,14 @@ import datetime
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from src.config.database import Base
 from src.models.workout import AO, Member, MemberAlias, Workout, WorkoutAO, WorkoutPax, WorkoutQ
 
 
 def seed_test_member_data(db: Session) -> dict[str, int]:
     """Helper fixture to insert mock members, aliases, workouts, and attendances."""
+    Base.metadata.drop_all(bind=db.get_bind())
+    Base.metadata.create_all(bind=db.get_bind())
     # 1. Insert Members (intentionally inserted in non-alphabetical order)
     m1 = Member(member_id=1, f3_name="Splinter")
     m2 = Member(member_id=2, f3_name="Dingo")

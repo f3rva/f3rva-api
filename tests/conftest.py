@@ -20,6 +20,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-unit-testing-32-chars-long"
 
 from src.config.database import Base, get_db
+from src.models import workout as _workout_models  # noqa: F401
 from src.main import app
 
 # Shared test engine across all test fixtures

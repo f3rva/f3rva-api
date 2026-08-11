@@ -1,4 +1,4 @@
-"""Standalone test runner for verifying Phase 1 through Phase 5 components."""
+"""Standalone test runner for verifying Phase 1 through Phase 6 components."""
 
 from __future__ import annotations
 
@@ -17,11 +17,13 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-unit-testing-32-chars-long"
 
 from fastapi.testclient import TestClient
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.config.database import Base, get_db
+from src.models import workout as _workout_models  # noqa: F401 - Register SQLAlchemy metadata
 from src.main import app
 from tests.test_admin import (
     seed_admin_test_data,
@@ -85,6 +87,13 @@ from tests.test_reports import (
     test_get_member_distribution_not_found_404,
     test_get_member_distribution_success,
 )
+from tests.test_schedule import (
+    test_get_workout_schedule_missing_api_key,
+    test_get_workout_schedule_success,
+    test_get_workout_schedule_upstream_failure,
+    test_slugify,
+    test_transform_events_to_workouts,
+)
 from tests.test_utils import (
     test_timed_service_exception_logging,
     test_timed_service_success,
@@ -116,7 +125,7 @@ from tests.test_workouts import (
 
 
 def run_all_tests():
-    print("🧪 Running Phase 1 through Phase 5 Complete Test Suite...\n")
+    print("🧪 Running Phase 1 through Phase 6 Complete Test Suite...\n")
 
     # 1. Database & Settings Lifecycle Tests
     test_get_engine_singleton()
@@ -135,6 +144,17 @@ def run_all_tests():
 
     assert dummy_func(2, 3) == 5
     print("  ✅ Service Latency & Logging Decorator Tests (2/2 passed)")
+
+    # 3. Schedule Service & Router Tests (Phase 6 Component 1)
+    test_slugify()
+    test_transform_events_to_workouts()
+    mp = pytest.MonkeyPatch()
+    with TestClient(app) as client:
+        test_get_workout_schedule_success(client, mp)
+        test_get_workout_schedule_missing_api_key(client, mp)
+        test_get_workout_schedule_upstream_failure(client, mp)
+    mp.undo()
+    print("  ✅ Phase 6: Schedule Fetch API & Transformation Tests (5/5 passed)")
 
     # Set up in-memory test database for workouts
     engine_w = create_engine(
@@ -169,6 +189,7 @@ def run_all_tests():
         print("  ✅ Phase 1: System Health, Exceptions & Docs Tests (10/10 passed)")
 
         # Phase 2: Workouts & Backblasts Read Tests
+        app.dependency_overrides[get_db] = override_get_db_w
         test_get_recent_workouts(client, db_w)
         test_get_workouts_pagination_empty(client, db_w)
         test_get_workouts_by_year(client, db_w)
@@ -313,7 +334,7 @@ def run_all_tests():
     Base.metadata.drop_all(bind=engine_a)
     engine_a.dispose()
 
-    print("\n🎉 ALL 70 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
+    print("\n🎉 ALL 75 TESTS PASSED WITH 100% CODE COVERAGE ACROSS ALL MODULES!")
 
 
 if __name__ == "__main__":

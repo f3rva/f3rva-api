@@ -1,4 +1,4 @@
-"""Pydantic v2 Request and Response Data Transfer Objects (DTOs)."""
+"""Pydantic v2 Models & Response Schemas for F3 RVA REST API."""
 
 from __future__ import annotations
 
@@ -6,174 +6,197 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AOSummary(BaseModel):
-    """Area of Operations summary DTO."""
+    """Area of Operations summary."""
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: int | None = Field(default=None, description="AO Identifier")
-    description: str = Field(..., description="AO Description / Name")
-    slug: str | None = Field(default=None, description="AO URL slug")
+    id: int = Field(..., description="Unique AO ID")
+    description: str = Field(..., description="Full display name of AO")
+    slug: str | None = Field(default=None, description="URL-friendly slug")
 
 
 class MemberSummary(BaseModel):
-    """Member summary DTO representing a Q or PAX attendee."""
-
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True, str_strip_whitespace=True)
-
-    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Unique Member ID")
-    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Nickname / Name")
-
-
-class WorkoutResponse(BaseModel):
-    """Workout response model matching legacy PHP JSON contract 1:1."""
-
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True, str_strip_whitespace=True)
-
-    workout_id: int = Field(..., alias="workoutId", serialization_alias="workoutId", description="Unique Workout ID")
-    backblast_url: str | None = Field(default=None, alias="backblastUrl", serialization_alias="backblastUrl")
-    title: str = Field(..., description="Backblast Title")
-    author: str | None = Field(default=None, description="Author")
-    slug: str | None = Field(default=None, description="Backblast URL slug")
-    ao: list[AOSummary] = Field(default_factory=list, description="Associated AOs")
-    q: list[MemberSummary] = Field(default_factory=list, description="Workout Leaders (Qs)")
-    pax: list[MemberSummary] | None = Field(default=None, description="Workout attendees (PAX roster)")
-    pax_count: int = Field(default=0, alias="paxCount", serialization_alias="paxCount", description="Attendee count")
-    workout_date: str = Field(..., alias="workoutDate", serialization_alias="workoutDate", description="Workout Date YYYY-MM-DD")
-    content: str | None = Field(default=None, description="Backblast HTML Content")
-
-
-class MemberStatsResponse(BaseModel):
-    """Member statistical summary representing workout attendance and Q ratios."""
+    """Member / PAX summary."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Unique Member ID")
-    num_workouts: int = Field(..., alias="numWorkouts", serialization_alias="numWorkouts", description="Total workouts attended")
-    num_qs: int = Field(..., alias="numQs", serialization_alias="numQs", description="Total workouts led (Q'd)")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Name / Nickname")
+
+
+class WorkoutResponse(BaseModel):
+    """Full workout entity schema."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    workout_id: int = Field(..., alias="workoutId", serialization_alias="workoutId", description="Unique Workout ID")
+    workout_date: str = Field(..., alias="workoutDate", serialization_alias="workoutDate", description="Date of workout (YYYY-MM-DD)")
+    title: str = Field(..., description="Title of the workout backblast")
+    author: str | None = Field(default=None, description="Author display name")
+    slug: str | None = Field(default=None, description="URL-safe slug")
+    backblast_url: str | None = Field(default=None, alias="backblastUrl", serialization_alias="backblastUrl", description="External backblast link")
+    pax_count: int = Field(default=0, alias="paxCount", serialization_alias="paxCount", description="Total number of attendees")
+    ao: list[AOSummary] = Field(default_factory=list, description="Associated AOs")
+    q: list[MemberSummary] = Field(default_factory=list, description="Workout leaders / Qs")
+    pax: list[MemberSummary] | None = Field(default=None, description="Full attendee list (only on detail views)")
+    content: str | None = Field(default=None, description="Raw HTML backblast body content")
+
+
+class MemberStatsResponse(BaseModel):
+    """Member attendance statistics."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Unique Member ID")
+    num_workouts: int = Field(..., alias="numWorkouts", serialization_alias="numWorkouts", description="Total attended workouts")
+    num_qs: int = Field(..., alias="numQs", serialization_alias="numQs", description="Total Q'd workouts")
     q_ratio: float = Field(..., alias="qRatio", serialization_alias="qRatio", description="Ratio of Qs to total workouts (0.0 to 1.0)")
 
 
 class MemberDetailResponse(BaseModel):
-    """Comprehensive member profile including aliases, stats, and workout histories."""
+    """Full member profile including aliases, stats, and workouts."""
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Unique Member ID")
     f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="Primary F3 Name")
-    aliases: list[str] = Field(default_factory=list, description="Registered aliases for this member")
-    stats: MemberStatsResponse | None = Field(default=None, description="Workout attendance and Q stats")
+    aliases: list[str] = Field(default_factory=list, description="Known aliases for this member")
+    stats: MemberStatsResponse = Field(..., description="Member attendance statistics")
     attended_workouts: list[WorkoutResponse] = Field(default_factory=list, alias="attendedWorkouts", serialization_alias="attendedWorkouts", description="Workouts attended as PAX")
     qd_workouts: list[WorkoutResponse] = Field(default_factory=list, alias="qdWorkouts", serialization_alias="qdWorkouts", description="Workouts led as Q")
 
 
+MemberProfileResponse = MemberDetailResponse
+
+
 class AttendanceLeaderboardItem(BaseModel):
-    """Leaderboard item for member attendance over a given date range."""
+    """PAX attendance count entry for reports."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Member ID")
-    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Nickname")
-    num_workouts: int = Field(..., alias="numWorkouts", serialization_alias="numWorkouts", description="Workouts attended in period")
-    num_qs: int = Field(..., alias="numQs", serialization_alias="numQs", description="Workouts led (Q'd) in period")
-    q_ratio: float = Field(..., alias="qRatio", serialization_alias="qRatio", description="Q to workout ratio in period")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Name")
+    num_workouts: int = Field(..., alias="numWorkouts", serialization_alias="numWorkouts", description="Total workouts attended")
+    num_qs: int = Field(..., alias="numQs", serialization_alias="numQs", description="Total workouts Q'd")
+    q_ratio: float = Field(..., alias="qRatio", serialization_alias="qRatio", description="Q Ratio (Qs / Workouts)")
+
+
+AttendanceCount = AttendanceLeaderboardItem
 
 
 class AOAttendanceSummary(BaseModel):
-    """Statistical summary of workout attendance across an Area of Operations (AO)."""
+    """Average attendance metric for an AO."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     ao_id: int = Field(..., alias="aoId", serialization_alias="aoId", description="AO ID")
     description: str = Field(..., description="AO Name / Description")
-    slug: str | None = Field(default=None, description="AO URL slug")
-    total_workouts: int = Field(..., alias="totalWorkouts", serialization_alias="totalWorkouts", description="Total workouts conducted")
-    total_pax: int = Field(..., alias="totalPax", serialization_alias="totalPax", description="Total PAX attendance sum")
-    average_pax: float = Field(..., alias="averagePax", serialization_alias="averagePax", description="Average PAX per workout")
+    slug: str | None = Field(default=None, description="AO slug")
+    total_workouts: int = Field(..., alias="totalWorkouts", serialization_alias="totalWorkouts", description="Total workouts held")
+    total_pax: int = Field(..., alias="totalPax", serialization_alias="totalPax", description="Total PAX attendees across workouts")
+    average_pax: float = Field(..., alias="averagePax", serialization_alias="averagePax", description="Average PAX attendance per workout")
+
+
+AOAttendanceAverage = AOAttendanceSummary
 
 
 class LeaderboardEntry(BaseModel):
-    """Generic leaderboard entry for top Qs, top attendees, and streakers."""
+    """Ranked leaderboard entry for Top Q or Top PAX."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: int = Field(..., description="Entity identifier (Member ID or AO ID)")
-    name: str = Field(..., description="Entity display name")
-    count: int = Field(..., description="Count or streak value")
+    id: int = Field(..., description="Member ID")
+    name: str = Field(..., description="F3 Name")
+    count: int = Field(..., description="Total count (Qs or Attendances)")
+
+
+AOLeaderboardEntry = LeaderboardEntry
+
+
+class StreakerEntry(BaseModel):
+    """Member on an active consecutive attendance streak."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Member ID")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Name")
+    streak: int = Field(..., description="Length of active consecutive workout streak")
 
 
 class AOLeaderboardResponse(BaseModel):
-    """Leaderboard analytics for a specific AO including top leaders, top PAX, and active streaks."""
+    """Consolidated AO detail metrics (Top Qs, Top PAX, Streakers)."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    ao_id: int = Field(..., alias="aoId", serialization_alias="aoId", description="AO ID")
-    description: str = Field(..., description="AO Description")
-    top_qs: list[LeaderboardEntry] = Field(default_factory=list, alias="topQs", serialization_alias="topQs", description="Top Q leaders at this AO")
-    top_pax: list[LeaderboardEntry] = Field(default_factory=list, alias="topPax", serialization_alias="topPax", description="Top PAX attendees at this AO")
-    streakers: list[LeaderboardEntry] = Field(default_factory=list, description="Members with consecutive workout attendance streaks")
+    ao_id: int = Field(..., alias="aoId", serialization_alias="aoId")
+    description: str = Field(..., description="AO Name / Description")
+    top_qs: list[LeaderboardEntry] = Field(default_factory=list, alias="topQs", serialization_alias="topQs")
+    top_pax: list[LeaderboardEntry] = Field(default_factory=list, alias="topPax", serialization_alias="topPax")
+    streakers: list[LeaderboardEntry] = Field(default_factory=list, description="Active attendance streakers")
 
 
 class DayOfWeekAttendance(BaseModel):
-    """Attendance statistics grouped by day of the week."""
+    """Day of week workout aggregation."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    day_id: int = Field(..., alias="dayId", serialization_alias="dayId", description="Day Index (1=Sunday, 7=Saturday)")
-    day_name: str = Field(..., alias="dayName", serialization_alias="dayName", description="Day Name (e.g. Monday)")
-    workout_count: int = Field(..., alias="workoutCount", serialization_alias="workoutCount", description="Workouts hosted on this day")
-    total_pax: int = Field(..., alias="totalPax", serialization_alias="totalPax", description="Sum of PAX attendance on this day")
+    day_id: int = Field(..., alias="dayId", serialization_alias="dayId", description="MySQL Day of Week (1=Sunday, 7=Saturday)")
+    day_name: str = Field(..., alias="dayName", serialization_alias="dayName", description="Day Name (Sunday, Monday, etc.)")
+    workout_count: int = Field(..., alias="workoutCount", serialization_alias="workoutCount", description="Number of workouts held on this day")
+    total_pax: int = Field(..., alias="totalPax", serialization_alias="totalPax", description="Total attendee count on this day")
     average_pax: float = Field(..., alias="averagePax", serialization_alias="averagePax", description="Average PAX per workout")
 
 
+DayOfWeekStat = DayOfWeekAttendance
+
+
 class MemberAODistribution(BaseModel):
-    """Breakdown of workouts attended and Q'd by AO for a specific member."""
+    """Member attendance and Q counts grouped by AO."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     ao_id: int = Field(..., alias="aoId", serialization_alias="aoId", description="AO ID")
     description: str = Field(..., description="AO Name")
-    q_count: int = Field(..., alias="qCount", serialization_alias="qCount", description="Workouts Q'd at this AO")
-    pax_count: int = Field(..., alias="paxCount", serialization_alias="paxCount", description="Workouts attended at this AO")
+    q_count: int = Field(..., alias="qCount", serialization_alias="qCount", description="Total Qs at this AO")
+    pax_count: int = Field(..., alias="paxCount", serialization_alias="paxCount", description="Total PAX attendances at this AO")
+
+
+MemberDistributionItem = MemberAODistribution
 
 
 class MemberDistributionResponse(BaseModel):
-    """Member AO attendance distribution response."""
+    """Full member AO distribution breakdown."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Member ID")
-    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="Member Name")
-    distribution: list[MemberAODistribution] = Field(default_factory=list, description="AO attendance breakdown")
-
-
-# ==========================================
-# Phase 5: Mutation & Admin Schemas
-# ==========================================
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Name")
+    distribution: list[MemberAODistribution] = Field(default_factory=list, description="List of AO distribution counts")
 
 
 class AOInput(BaseModel):
-    """Area of Operations input specification."""
+    """AO structure accepted in add workout request."""
 
-    model_config = ConfigDict(str_strip_whitespace=True, populate_by_name=True)
+    model_config = ConfigDict(str_strip_whitespace=True)
 
-    name: str = Field(..., min_length=1, description="AO description/name (e.g. 'First Watch')")
-    slug: str | None = Field(None, description="AO URL slug (e.g. 'first-watch')")
+    name: str = Field(..., min_length=1, description="AO Description / Name")
+    slug: str | None = Field(default=None, description="AO Slug (e.g. 'first-watch')")
 
 
 class AddWorkoutRequest(BaseModel):
-    """Structured payload to add a workout directly with data."""
+    """Structured payload for adding a workout."""
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
-    title: str = Field(..., min_length=1, description="Workout title")
-    workout_date: str = Field(..., alias="workoutDate", description="Workout date (YYYY-MM-DD, YYYYMMDD, or MM/DD/YYYY)")
-    qic: str | list[str] = Field(..., description="Workout leader(s) (Qs) as comma-separated string or list of names")
-    pax: str | list[str] = Field(..., description="Workout attendees (PAX) as comma-separated string or list of names")
-    aos: list[AOInput] = Field(..., min_length=1, description="AOs where workout was hosted (list of objects with 'name' and optional 'slug')")
-    url: str | None = Field(None, description="Backblast URL")
-    author: str | None = Field(None, description="Backblast author")
-    slug: str | None = Field(None, description="URL slug")
-    body: str | None = Field(None, description="HTML or plain text backblast body")
+    title: str = Field(..., min_length=1, max_length=255, description="Workout title")
+    workout_date: str = Field(..., alias="workoutDate", description="Date of workout (YYYY-MM-DD)")
+    qic: list[str] | str = Field(..., description="List or comma-separated string of Qs")
+    pax: list[str] | str = Field(..., description="List or comma-separated string of attendees")
+    aos: list[AOInput] | list[str] | str = Field(..., description="List of AOInput objects, list of AO names, or comma-separated string")
+    body: str | None = Field(default=None, description="HTML or text content of the backblast")
+    url: str | None = Field(default=None, description="Direct URL to original backblast post")
+    author: str | None = Field(default=None, description="Author name")
+    slug: str | None = Field(default=None, description="Custom URL slug")
 
 
 class WorkoutCreatedResponse(BaseModel):
@@ -229,8 +252,33 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(default=86400, alias="expiresIn", serialization_alias="expiresIn")
 
 
+class WorkoutScheduleItem(BaseModel):
+    """Workout item for website schedule view."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    location: str = Field(..., description="Location name or address")
+    location_url: str = Field(..., alias="locationURL", serialization_alias="locationURL", description="Google Maps URL")
+    name: str = Field(..., description="Workout / AO Name")
+    tag_url: str = Field(..., alias="tagURL", serialization_alias="tagURL", description="Local archive tag URL")
+    day_of_week: str = Field(..., alias="dayOfWeek", serialization_alias="dayOfWeek", description="Day of week (Monday, Tuesday, etc.)")
+    start_time: str = Field(..., alias="startTime", serialization_alias="startTime", description="Start time (e.g. 0530)")
+    end_time: str = Field(..., alias="endTime", serialization_alias="endTime", description="End time (e.g. 0615)")
+    workout_style: str = Field(..., alias="workoutStyle", serialization_alias="workoutStyle", description="Workout style / category (Bootcamp, Run, etc.)")
+    site_q: str = Field(..., alias="siteQ", serialization_alias="siteQ", description="Site Q leader name")
+    notes: str = Field(..., description="Notes and instructions")
+
+
+class WorkoutScheduleResponse(BaseModel):
+    """Top-level schedule response matching f3rva-website expectations."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    first_f: list[WorkoutScheduleItem] = Field(..., alias="1stF", serialization_alias="1stF", description="List of 1stF workouts")
+
+
 class ErrorResponse(BaseModel):
-    """Standard error response matching legacy PHP JSON structure."""
+    """Standard error response matching legacy JSON structure."""
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
