@@ -2,26 +2,17 @@
 
 from __future__ import annotations
 
-# pyright: reportArgumentType=false
-
 import os
-import importlib
 from functools import lru_cache
-from typing import Any, cast
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 try:
-    boto3 = cast(Any, importlib.import_module("boto3"))
+    import boto3
 except ImportError:
-    boto3 = None
-
-
-def _boto3_client(service_name: str, **kwargs: Any) -> Any:
-    """Return a boto3 client while tolerating incomplete local typing stubs."""
-    client_factory = cast(Any, getattr(boto3, "client"))
-    return client_factory(cast(Any, service_name), **kwargs)
+    boto3 = None  # type: ignore[assignment]
 
 
 def _fetch_ssm_parameters(env_key: str) -> dict[str, Any]:
@@ -42,20 +33,25 @@ def _fetch_ssm_parameters(env_key: str) -> dict[str, Any]:
 
     try:
         region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
-        ssm = _boto3_client("ssm", region_name=region)
+        ssm = boto3.client("ssm", region_name=region)
         prefix = f"/f3rva/{env_key}/"
         paginator = ssm.get_paginator("get_parameters_by_path")
         params: dict[str, Any] = {}
 
         for page in paginator.paginate(Path=prefix, WithDecryption=True):
             for param in page.get("Parameters", []):
-                raw_name = param["Name"].removeprefix(prefix).lower().replace("-", "_")
+                param_name = param.get("Name")
+                param_value = param.get("Value")
+                if not param_name or param_value is None:
+                    continue
+
+                raw_name = param_name.removeprefix(prefix).lower().replace("-", "_")
                 # Normalize key names to match Settings attribute names
                 if raw_name == "f3nation_api_key":
                     attr_name = "f3_nation_api_key"
                 else:
                     attr_name = raw_name
-                params[attr_name] = param["Value"]
+                params[attr_name] = param_value
         return params
     except Exception:
         return {}
