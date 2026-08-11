@@ -16,7 +16,7 @@ def get_version() -> str:
     """
     # 1. Check generated _version.py from setuptools_scm
     try:
-        from src._version import __version__  # type: ignore
+        from src._version import __version__
 
         return str(__version__)
     except ImportError:

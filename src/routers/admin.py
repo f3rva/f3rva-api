@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import hmac
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db

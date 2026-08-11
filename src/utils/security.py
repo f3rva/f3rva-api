@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import datetime
 from typing import Any
+
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-import jwt
 
 from src.config.settings import get_settings
 
@@ -17,10 +18,10 @@ def create_access_token(data: dict[str, Any], expires_delta: datetime.timedelta 
     """Generate a signed HS256 JWT bearer token."""
     settings = get_settings()
     to_encode = data.copy()
-    expire = datetime.datetime.now(datetime.timezone.utc) + (
+    expire = datetime.datetime.now(datetime.UTC) + (
         expires_delta or datetime.timedelta(hours=24)
     )
-    to_encode.update({"exp": expire, "iat": datetime.datetime.now(datetime.timezone.utc)})
+    to_encode.update({"exp": expire, "iat": datetime.datetime.now(datetime.UTC)})
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm="HS256")
 
 

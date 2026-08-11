@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
 import urllib.parse
 import urllib.request
+from typing import Any
+
 from fastapi import HTTPException, status
 
 from src.config.settings import get_settings
@@ -107,7 +108,7 @@ class ScheduleService:
                 data = json.loads(resp.read().decode("utf-8"))
                 events = data.get("events", [])
                 workouts = transform_events_to_workouts(events)
-                return WorkoutScheduleResponse(first_f=workouts)
+                return WorkoutScheduleResponse(**{"1stF": workouts})
         except HTTPException:
             raise
         except Exception as err:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,6 @@ from src.models.schemas import (
     LeaderboardEntry,
     MemberAODistribution,
     MemberDistributionResponse,
-    StreakerEntry,
 )
 from src.utils.logging import timed_service
 

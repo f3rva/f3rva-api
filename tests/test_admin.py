@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 import datetime
-from fastapi.testclient import TestClient
+
 import jwt
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from src.config.database import Base
 from src.config.settings import get_settings
-from src.models.workout import AO, Member, MemberAlias, MemberAliasAudit, Workout, WorkoutAO, WorkoutPax, WorkoutQ
+from src.models.workout import (
+    AO,
+    Member,
+    MemberAlias,
+    MemberAliasAudit,
+    Workout,
+    WorkoutAO,
+    WorkoutPax,
+    WorkoutQ,
+)
 from src.utils.security import create_access_token
 
 
@@ -226,7 +236,7 @@ def test_jwt_expired_token_rejected(client: TestClient) -> None:
     """Verify expired JWT token returns 401."""
     settings = get_settings()
     expired_token = jwt.encode(
-        {"sub": "admin", "exp": datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=10)},
+        {"sub": "admin", "exp": datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=10)},
         settings.jwt_secret_key,
         algorithm="HS256",
     )

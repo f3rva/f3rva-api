@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
@@ -93,7 +94,9 @@ class MemberService:
         aliases = list(alias_rows)
 
         # 2. Retrieve stats
-        stats = cls.get_member_stats(db=db, member_id=member_id)
+        stats = cls.get_member_stats(db=db, member_id=member_id) or MemberStatsResponse(
+            memberId=member_id, numWorkouts=0, numQs=0, qRatio=0.0
+        )
 
         # 3. Retrieve attended workouts (as PAX)
         pax_workouts_query = text(
@@ -216,7 +219,7 @@ class MemberService:
             )
 
             for idx, desc in enumerate(ao_descs):
-                ao_id = ao_ids[idx] if idx < len(ao_ids) else None
+                ao_id = ao_ids[idx] if idx < len(ao_ids) else 0
                 ao_slug = ao_slugs[idx] if idx < len(ao_slugs) else None
                 ao_list.append(AOSummary(id=ao_id, description=desc, slug=ao_slug))
 

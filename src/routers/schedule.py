@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Response
 
 from src.models.schemas import ErrorResponse, WorkoutScheduleResponse
 from src.services.schedule_service import ScheduleService

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from sqlalchemy import create_engine
+
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from src.config.settings import get_settings
@@ -16,11 +17,11 @@ class Base(DeclarativeBase):
 
 
 # Cached engine and sessionmaker singletons for Lambda connection reuse
-_engine = None
-_SessionLocal = None
+_engine: Engine | None = None
+_SessionLocal: sessionmaker[Session] | None = None
 
 
-def get_engine():
+def get_engine() -> Engine:
     """Create or return the global SQLAlchemy engine from the externalized DATABASE_URL with zero dialect checks."""
     global _engine
     if _engine is None:
@@ -34,7 +35,7 @@ def get_engine():
     return _engine
 
 
-def get_sessionmaker():
+def get_sessionmaker() -> sessionmaker[Session]:
     """Create or return the global session factory."""
     global _SessionLocal
     if _SessionLocal is None:
@@ -43,7 +44,7 @@ def get_sessionmaker():
     return _SessionLocal
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session]:
     """FastAPI dependency yielding a database session per request."""
     session_factory = get_sessionmaker()
     db: Session = session_factory()
