@@ -1,0 +1,128 @@
+name: CI / Build & Deploy
+
+on:
+  push:
+    branches: [ main ]            # deploy to development on pushes to main
+  release:
+    types: [ published ]          # deploy to production when a release is published
+
+jobs:
+  deploy-dev:
+    environment: development
+    permissions:
+      contents: read
+      id-token: write
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint with Ruff
+        run: ruff check src tests
+
+      - name: Type check with MyPy
+        run: mypy src
+
+      - name: Run Test Suite
+        run: pytest -v --cov=src --cov-fail-under=80
+
+      - name: Build Lambda Package (ARM64)
+        run: |
+          mkdir -p build/package
+          pip install --target build/package -r requirements.txt --platform manylinux2014_aarch64 --only-binary=:all:
+          cp -r src build/package/
+          cd build/package && zip -r ../lambda.zip . -x "*.pyc" -x "__pycache__/*"
+          cd ../..
+
+      - name: Configure AWS credentials (OIDC / role for dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.DEV_AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.DEV_AWS_REGION }}
+
+      - name: Deploy to Dev Lambda
+        run: |
+          FUNCTION_NAME="${{ secrets.DEV_LAMBDA_FUNCTION_NAME }}"
+          echo "Deploying to AWS Lambda: $FUNCTION_NAME"
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://build/lambda.zip
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.DEV_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+  deploy-prod:
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint with Ruff
+        run: ruff check src tests
+
+      - name: Type check with MyPy
+        run: mypy src
+
+      - name: Run Test Suite
+        run: pytest -v --cov=src --cov-fail-under=80
+
+      - name: Build Lambda Package (ARM64)
+        run: |
+          mkdir -p build/package
+          pip install --target build/package -r requirements.txt --platform manylinux2014_aarch64 --only-binary=:all:
+          cp -r src build/package/
+          cd build/package && zip -r ../lambda.zip . -x "*.pyc" -x "__pycache__/*"
+          cd ../..
+
+      - name: Configure AWS credentials (OIDC / role for prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PROD_AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
+
+      - name: Deploy to Prod Lambda
+        run: |
+          FUNCTION_NAME="${{ secrets.PROD_LAMBDA_FUNCTION_NAME }}"
+          echo "Deploying to AWS Lambda: $FUNCTION_NAME"
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://build/lambda.zip
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.PROD_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
