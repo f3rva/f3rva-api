@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import io
 import json
 import urllib.request
-from fastapi.testclient import TestClient
+
 import pytest
+from fastapi.testclient import TestClient
 
 from src.config.settings import get_settings
-from src.services.schedule_service import ScheduleService, slugify, transform_events_to_workouts
-
+from src.services.schedule_service import slugify, transform_events_to_workouts
 
 MOCK_F3_NATION_RESPONSE = {
     "events": [

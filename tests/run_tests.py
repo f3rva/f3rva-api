@@ -16,17 +16,16 @@ os.environ["DEBUG"] = "false"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-unit-testing-32-chars-long"
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.config.database import Base, get_db
-from src.models import workout as _workout_models  # noqa: F401 - Register SQLAlchemy metadata
 from src.main import app
+from src.models import workout as _workout_models  # noqa: F401 - Register SQLAlchemy metadata
 from tests.test_admin import (
-    seed_admin_test_data,
     test_admin_login_invalid_credentials,
     test_admin_login_success,
     test_approve_alias_request_merges_records,
@@ -62,7 +61,6 @@ from tests.test_health import (
     test_swagger_docs_available,
 )
 from tests.test_members import (
-    seed_test_member_data,
     test_get_all_members_alphabetical,
     test_get_member_by_id_full_profile,
     test_get_member_by_id_not_found_404,
@@ -75,7 +73,6 @@ from tests.test_members import (
     test_lookup_member_not_found_404,
 )
 from tests.test_reports import (
-    seed_test_report_data,
     test_get_ao_attendance_summary,
     test_get_ao_leaderboard_not_found_404,
     test_get_ao_leaderboard_with_streakers,
@@ -94,10 +91,6 @@ from tests.test_schedule import (
     test_slugify,
     test_transform_events_to_workouts,
 )
-from tests.test_utils import (
-    test_timed_service_exception_logging,
-    test_timed_service_success,
-)
 from tests.test_workout_mutations import (
     test_add_workout_date_formats,
     test_add_workout_future_date_rejected,
@@ -110,7 +103,6 @@ from tests.test_workout_mutations import (
     test_delete_workout_unauthorized_without_token,
 )
 from tests.test_workouts import (
-    seed_test_workout_data,
     test_get_recent_workouts,
     test_get_workout_by_date_and_slug,
     test_get_workout_by_id_with_pax_roster,

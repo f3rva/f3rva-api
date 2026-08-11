@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
+# pyright: reportArgumentType=false
+
 import os
-from typing import Any
+import importlib
+from functools import lru_cache
+from typing import Any, cast
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 try:
-    import boto3
-    HAS_BOTO3 = True
+    boto3 = cast(Any, importlib.import_module("boto3"))
 except ImportError:
-    HAS_BOTO3 = False
+    boto3 = None
+
+
+def _boto3_client(service_name: str, **kwargs: Any) -> Any:
+    """Return a boto3 client while tolerating incomplete local typing stubs."""
+    client_factory = cast(Any, getattr(boto3, "client"))
+    return client_factory(cast(Any, service_name), **kwargs)
 
 
 def _fetch_ssm_parameters(env_key: str) -> dict[str, Any]:
@@ -22,7 +31,7 @@ def _fetch_ssm_parameters(env_key: str) -> dict[str, Any]:
     - Skipped if in 'testing' environment or if ENABLE_SSM is explicitly set to false.
     - Only runs when in AWS (AWS_LAMBDA_FUNCTION_NAME / AWS_EXECUTION_ENV) or when ENABLE_SSM is 'true'.
     """
-    if not HAS_BOTO3 or os.getenv("ENVIRONMENT") == "testing":
+    if boto3 is None or os.getenv("ENVIRONMENT") == "testing":
         return {}
 
     # Only fetch SSM if running in AWS Lambda or explicitly enabled for local testing
@@ -33,7 +42,7 @@ def _fetch_ssm_parameters(env_key: str) -> dict[str, Any]:
 
     try:
         region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
-        ssm = boto3.client("ssm", region_name=region)
+        ssm = _boto3_client("ssm", region_name=region)
         prefix = f"/f3rva/{env_key}/"
         paginator = ssm.get_paginator("get_parameters_by_path")
         params: dict[str, Any] = {}

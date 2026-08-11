@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 

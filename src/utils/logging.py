@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import functools
 import logging
 import time
-from typing import Any, TypeVar
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger("f3rva.services")
 
-F = TypeVar("F", bound=Callable[..., Any])
-
-
-def timed_service(func: F) -> F:
+def timed_service[F: Callable[..., Any]](func: F) -> F:
     """Decorator to trace service call execution, recording start time, completion duration (ms), and errors.
 
     Emits structured DEBUG logs at entry and exit for precise latency troubleshooting in local dev & CloudWatch.

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 import os
+from collections.abc import Generator
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -20,8 +21,8 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-unit-testing-32-chars-long"
 
 from src.config.database import Base, get_db
-from src.models import workout as _workout_models  # noqa: F401
 from src.main import app
+from src.models import workout as _workout_models  # noqa: F401
 
 # Shared test engine across all test fixtures
 test_engine = create_engine(
@@ -33,7 +34,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 
 @pytest.fixture(autouse=True)
-def setup_database() -> Generator[None, None, None]:
+def setup_database() -> Generator[None]:
     """Create all tables before each test and drop them after each test."""
     Base.metadata.create_all(bind=test_engine)
     yield
@@ -41,7 +42,7 @@ def setup_database() -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def db_session() -> Generator[Session, None, None]:
+def db_session() -> Generator[Session]:
     """Yield a database session bound to the in-memory test engine."""
     session = TestingSessionLocal()
     try:
@@ -51,7 +52,7 @@ def db_session() -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient, None, None]:
+def client(db_session: Session) -> Generator[TestClient]:
     """FastAPI TestClient with overridden database dependency bound to db_session."""
 
     def override_get_db():

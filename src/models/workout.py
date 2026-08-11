@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+
 from sqlalchemy import Date, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 

@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import datetime
 import re
+
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
-from src.models.schemas import AddWorkoutRequest, AOInput, DeleteWorkoutResponse, WorkoutCreatedResponse
-from src.models.workout import AO, Member, MemberAlias, Workout, WorkoutAO, WorkoutDetails, WorkoutPax, WorkoutQ
+from src.models.schemas import (
+    AddWorkoutRequest,
+    AOInput,
+    DeleteWorkoutResponse,
+    WorkoutCreatedResponse,
+)
+from src.models.workout import (
+    AO,
+    Member,
+    MemberAlias,
+    Workout,
+    WorkoutAO,
+    WorkoutDetails,
+    WorkoutPax,
+    WorkoutQ,
+)
 from src.utils.logging import timed_service
 
 
@@ -72,7 +87,18 @@ class WorkoutMutationService:
             db.add(WorkoutDetails(workout_id=wid, html_content=data.body))
 
         # 5. Persist AOs
-        for ao_input in data.aos:
+        ao_items: list[AOInput] = []
+        if isinstance(data.aos, str):
+            ao_items = [AOInput(name=a.strip()) for a in data.aos.split(",") if a.strip()]
+        elif isinstance(data.aos, list):
+            for item in data.aos:
+                if isinstance(item, str):
+                    if item.strip():
+                        ao_items.append(AOInput(name=item.strip()))
+                elif isinstance(item, AOInput):
+                    ao_items.append(item)
+
+        for ao_input in ao_items:
             ao_obj = cls._get_or_create_ao(db=db, ao_name=ao_input.name, ao_slug=ao_input.slug)
             db.add(WorkoutAO(workout_id=wid, ao_id=ao_obj.ao_id))
 

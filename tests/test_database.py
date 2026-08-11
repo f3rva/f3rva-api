@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import importlib.metadata
-import subprocess
 from unittest.mock import patch
+
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from src.config import database
 from src.config.database import get_db, get_engine, get_sessionmaker
-from src.config.settings import Settings, get_settings
+from src.config.settings import get_settings
 from src.config.version import get_version
 
 
@@ -83,8 +83,9 @@ def test_get_version_branches() -> None:
 
 def test_fetch_ssm_parameters_in_aws() -> None:
     """Verify _fetch_ssm_parameters fetches and maps parameters from AWS SSM Parameter Store."""
-    from src.config.settings import _fetch_ssm_parameters
     from unittest.mock import MagicMock
+
+    from src.config.settings import _fetch_ssm_parameters
 
     mock_paginator = MagicMock()
     mock_paginator.paginate.return_value = [

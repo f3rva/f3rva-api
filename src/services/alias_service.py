@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from src.models.schemas import AliasClaimRequest, AliasRequestResponse, MemberSummary
+from src.models.schemas import AliasRequestResponse, MemberSummary
 from src.models.workout import Member, MemberAlias, MemberAliasAudit, MemberAliasRequest
 from src.utils.logging import timed_service
 

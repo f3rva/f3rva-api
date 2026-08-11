@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
 import calendar
 import datetime
+from collections.abc import Mapping
+from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
@@ -362,7 +363,7 @@ class WorkoutService:
             )
 
             for idx, desc in enumerate(ao_descs):
-                ao_id = ao_ids[idx] if idx < len(ao_ids) else None
+                ao_id = ao_ids[idx] if idx < len(ao_ids) else 0
                 ao_slug = ao_slugs[idx] if idx < len(ao_slugs) else None
                 ao_list.append(AOSummary(id=ao_id, description=desc, slug=ao_slug))
 
