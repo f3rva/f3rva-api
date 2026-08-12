@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Python 3.13
         uses: actions/setup-python@v5
@@ -40,6 +42,13 @@ jobs:
 
       - name: Build Lambda Package (ARM64)
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo "0.1.0-dev")
+          fi
+          echo "__version__ = '$VERSION'" > src/_version.py
+          echo "Building Lambda package with version: $VERSION"
+
           mkdir -p build/package
           pip install --target build/package -r requirements.txt --platform manylinux2014_aarch64 --only-binary=:all:
           cp -r src build/package/
@@ -77,6 +86,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Python 3.13
         uses: actions/setup-python@v5
@@ -100,6 +111,13 @@ jobs:
 
       - name: Build Lambda Package (ARM64)
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo "1.0.0")
+          fi
+          echo "__version__ = '$VERSION'" > src/_version.py
+          echo "Building Lambda package with version: $VERSION"
+
           mkdir -p build/package
           pip install --target build/package -r requirements.txt --platform manylinux2014_aarch64 --only-binary=:all:
           cp -r src build/package/
