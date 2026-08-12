@@ -46,11 +46,20 @@ jobs:
           cd build/package && zip -r ../lambda.zip . -x "*.pyc" -x "__pycache__/*"
           cd ../..
 
+      - name: Debug GitHub OIDC Token Claims
+        run: |
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
+          PADDING=$(($(echo -n "$PAYLOAD" | wc -c) % 4))
+          if [ $PADDING -eq 2 ]; then PAYLOAD="${PAYLOAD}=="; elif [ $PADDING -eq 3 ]; then PAYLOAD="${PAYLOAD}="; fi
+          echo "=== Decoded GitHub OIDC Claims ==="
+          echo "$PAYLOAD" | base64 -d | jq '{sub: .sub, aud: .aud, repository: .repository, repository_owner: .repository_owner, environment: .environment, iss: .iss}'
+
       - name: Configure AWS credentials (OIDC / role for dev)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.DEV_AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.DEV_AWS_REGION }}
+          aws-region: ${{ secrets.DEV_AWS_REGION || 'us-east-1' }}
 
       - name: Deploy to Dev Lambda
         run: |
