@@ -1,24 +1,11 @@
 {
   "info": {
-    "_postman_id": "ec1f6226-cd98-44af-80b8-80471f0091fd",
-    "name": "F3 RVA API",
-    "description": "Complete Postman collection for the F3 RVA modern Python serverless REST API (Phases 1 through 6).",
+    "_postman_id": "7311d18b-949c-4ace-a72b-cf5f18351f7c",
+    "name": "F3 API",
+    "description": "Complete Postman collection for the F3 modern Python serverless REST API (Phases 1 through 6). Configured to use Postman Environments (apiBaseUrl, authToken).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8000",
-      "type": "string",
-      "description": "API Base URL (e.g. http://localhost:8000, https://api.dev.f3rva.org, https://api.f3rva.org)"
-    },
-    {
-      "key": "authToken",
-      "value": "",
-      "type": "string",
-      "description": "JWT Bearer token for protected admin endpoints (populated after /v2/admin/login)"
-    }
-  ],
+  "variable": [],
   "item": [
     {
       "name": "1. System & Health",
@@ -35,9 +22,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/health",
+              "raw": "{{apiBaseUrl}}/health",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "health"
@@ -59,9 +46,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/health/db",
+              "raw": "{{apiBaseUrl}}/health/db",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "health",
@@ -84,9 +71,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/openapi.json",
+              "raw": "{{apiBaseUrl}}/openapi.json",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "openapi.json"
@@ -113,9 +100,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts?page=1&results=20",
+              "raw": "{{apiBaseUrl}}/v2/workouts?page=1&results=20",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -150,9 +137,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts?year=2026&month=8&day=7",
+              "raw": "{{apiBaseUrl}}/v2/workouts?year=2026&month=8&day=7",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -192,9 +179,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/101",
+              "raw": "{{apiBaseUrl}}/v2/workouts/101",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -218,9 +205,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/2026-08-07/beatdown-at-gridiron",
+              "raw": "{{apiBaseUrl}}/v2/workouts/2026-08-07/beatdown-at-gridiron",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -245,9 +232,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/ao/dogpile?page=1&results=20",
+              "raw": "{{apiBaseUrl}}/v2/workouts/ao/dogpile?page=1&results=20",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -298,9 +285,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts",
+              "raw": "{{apiBaseUrl}}/v2/workouts",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -333,9 +320,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/workouts/101",
+              "raw": "{{apiBaseUrl}}/v2/workouts/101",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -343,7 +330,7 @@
                 "101"
               ]
             },
-            "description": "Atomically deletes a workout and cascades all junction associations. Requires admin JWT."
+            "description": "Deletes a workout and all associated attendee and leader records. Requires admin JWT."
           },
           "response": []
         }
@@ -353,7 +340,7 @@
       "name": "3. Members & PAX Analytics",
       "item": [
         {
-          "name": "List All Members (Alphabetical)",
+          "name": "Get All Members",
           "request": {
             "method": "GET",
             "header": [
@@ -364,21 +351,21 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/members",
+              "raw": "{{apiBaseUrl}}/v2/members",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
                 "members"
               ]
             },
-            "description": "Returns all registered F3 members sorted alphabetically by name."
+            "description": "Returns full list of all F3 RVA members sorted alphabetically."
           },
           "response": []
         },
         {
-          "name": "Get Member Profile by ID",
+          "name": "Get Member Profile & Workout History",
           "request": {
             "method": "GET",
             "header": [
@@ -389,9 +376,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/members/1",
+              "raw": "{{apiBaseUrl}}/v2/members/1",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -399,12 +386,12 @@
                 "1"
               ]
             },
-            "description": "Retrieves complete member profile including aliases, statistics, attended workouts, and Q'd workouts."
+            "description": "Returns member profile with aliases, lifetime stats, attended workouts, and Q'd workouts."
           },
           "response": []
         },
         {
-          "name": "Get Member Statistics by ID",
+          "name": "Get Member Lifetime Stats",
           "request": {
             "method": "GET",
             "header": [
@@ -415,9 +402,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/members/1/stats",
+              "raw": "{{apiBaseUrl}}/v2/members/1/stats",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -426,7 +413,7 @@
                 "stats"
               ]
             },
-            "description": "Calculates member total attended workouts, total Qs, and computed Q-ratio."
+            "description": "Returns total workouts attended, total Qs, and computed Q-ratio."
           },
           "response": []
         },
@@ -442,9 +429,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/members/lookup?name=dingo",
+              "raw": "{{apiBaseUrl}}/v2/members/lookup?name=dingo",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -455,11 +442,11 @@
                 {
                   "key": "name",
                   "value": "dingo",
-                  "description": "Search query for primary name or registered alias"
+                  "description": "Search query"
                 }
               ]
             },
-            "description": "Case-insensitive member search across primary names and aliases."
+            "description": "Performs case-insensitive member search across primary names and registered aliases."
           },
           "response": []
         }
@@ -469,7 +456,7 @@
       "name": "4. Reports, Leaderboards & AO Metrics",
       "item": [
         {
-          "name": "PAX Attendance Leaderboard (Default: Workouts)",
+          "name": "Attendance Leaderboard (Sorted by Workouts)",
           "request": {
             "method": "GET",
             "header": [
@@ -480,9 +467,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/attendance?sortBy=workout&limit=50",
+              "raw": "{{apiBaseUrl}}/v2/reports/attendance?sortBy=workouts&page=1&results=50",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -492,22 +479,27 @@
               "query": [
                 {
                   "key": "sortBy",
-                  "value": "workout",
-                  "description": "Sort criteria: 'workout', 'q', or 'ratio'"
+                  "value": "workouts",
+                  "description": "Sort field (workouts, q, ratio)"
                 },
                 {
-                  "key": "limit",
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "results",
                   "value": "50",
-                  "description": "Maximum number of leaderboard results"
+                  "description": "Page size"
                 }
               ]
             },
-            "description": "Ranked leaderboard of members by total workout attendances."
+            "description": "Leaderboard ranking all members by total workout attendance."
           },
           "response": []
         },
         {
-          "name": "PAX Attendance Leaderboard (Sorted by Qs)",
+          "name": "Attendance Leaderboard (Sorted by Qs)",
           "request": {
             "method": "GET",
             "header": [
@@ -518,9 +510,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/attendance?sortBy=q&limit=50",
+              "raw": "{{apiBaseUrl}}/v2/reports/attendance?sortBy=q&page=1&results=50",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -531,21 +523,26 @@
                 {
                   "key": "sortBy",
                   "value": "q",
-                  "description": "Sort by total Q count"
+                  "description": "Sort by Q count"
                 },
                 {
-                  "key": "limit",
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "results",
                   "value": "50",
-                  "description": "Limit"
+                  "description": "Page size"
                 }
               ]
             },
-            "description": "Ranked leaderboard of members by total workouts led as Q."
+            "description": "Leaderboard ranking members by number of workouts led as Q."
           },
           "response": []
         },
         {
-          "name": "PAX Attendance Leaderboard (Date Range Filter)",
+          "name": "Attendance Leaderboard (Date Range Filtered)",
           "request": {
             "method": "GET",
             "header": [
@@ -556,9 +553,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/attendance?startDate=2026-01-01&endDate=2026-12-31&sortBy=workout&limit=50",
+              "raw": "{{apiBaseUrl}}/v2/reports/attendance?startDate=2026-08-01&endDate=2026-08-31",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -568,32 +565,22 @@
               "query": [
                 {
                   "key": "startDate",
-                  "value": "2026-01-01",
-                  "description": "Filter start date (YYYY-MM-DD)"
+                  "value": "2026-08-01",
+                  "description": "Start date (YYYY-MM-DD)"
                 },
                 {
                   "key": "endDate",
-                  "value": "2026-12-31",
-                  "description": "Filter end date (YYYY-MM-DD)"
-                },
-                {
-                  "key": "sortBy",
-                  "value": "workout",
-                  "description": "Sort criteria"
-                },
-                {
-                  "key": "limit",
-                  "value": "50",
-                  "description": "Limit"
+                  "value": "2026-08-31",
+                  "description": "End date (YYYY-MM-DD)"
                 }
               ]
             },
-            "description": "Calculates member leaderboard within an arbitrary date range."
+            "description": "Leaderboard filtered to a custom date window."
           },
           "response": []
         },
         {
-          "name": "AO Attendance Averages",
+          "name": "AO Attendance Summary",
           "request": {
             "method": "GET",
             "header": [
@@ -604,9 +591,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/ao",
+              "raw": "{{apiBaseUrl}}/v2/reports/ao",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -614,12 +601,12 @@
                 "ao"
               ]
             },
-            "description": "Lists all AOs sorted by average PAX attendance per workout."
+            "description": "Summary of total workouts held and total attendee count across all AOs."
           },
           "response": []
         },
         {
-          "name": "AO Leaderboard & Streakers",
+          "name": "AO Leaderboard with Streak Calculations",
           "request": {
             "method": "GET",
             "header": [
@@ -630,9 +617,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/ao/1/leaderboard?limit=10",
+              "raw": "{{apiBaseUrl}}/v2/reports/ao/1/leaderboard",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -640,16 +627,9 @@
                 "ao",
                 "1",
                 "leaderboard"
-              ],
-              "query": [
-                {
-                  "key": "limit",
-                  "value": "10",
-                  "description": "Leaderboard limit"
-                }
               ]
             },
-            "description": "Retrieves Top Qs, Top Attendees, and active consecutive attendance streaks at an AO."
+            "description": "Member attendance leaderboard and active streaks for a specific AO."
           },
           "response": []
         },
@@ -665,9 +645,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/day-of-week",
+              "raw": "{{apiBaseUrl}}/v2/reports/day-of-week",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -675,7 +655,7 @@
                 "day-of-week"
               ]
             },
-            "description": "Aggregates workouts and attendee counts across Sunday through Saturday."
+            "description": "Workouts and attendance distribution mapped by day of the week (Sunday through Saturday)."
           },
           "response": []
         },
@@ -691,9 +671,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/reports/members/1/distribution",
+              "raw": "{{apiBaseUrl}}/v2/reports/members/1/distribution",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -703,7 +683,7 @@
                 "distribution"
               ]
             },
-            "description": "Breakdown of workouts attended and Q'd across all AOs for a specific member."
+            "description": "Attendance breakdown across different AOs for a specific member."
           },
           "response": []
         }
@@ -722,8 +702,8 @@
                   "if (pm.response.code === 200) {",
                   "    var jsonData = pm.response.json();",
                   "    if (jsonData.accessToken) {",
-                  "        pm.collectionVariables.set('authToken', jsonData.accessToken);",
-                  "        console.log('Saved authToken:', jsonData.accessToken);",
+                  "        pm.environment.set('authToken', jsonData.accessToken);",
+                  "        console.log('Saved authToken to environment:', jsonData.accessToken);",
                   "    }",
                   "}"
                 ],
@@ -755,9 +735,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/login",
+              "raw": "{{apiBaseUrl}}/v2/admin/login",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -765,7 +745,7 @@
                 "login"
               ]
             },
-            "description": "Authenticates admin credentials and returns an HS256 JWT Bearer token (auto-saved to {{authToken}} variable)."
+            "description": "Authenticates admin credentials and returns an HS256 JWT Bearer token (auto-saved to {{authToken}} environment variable)."
           },
           "response": []
         },
@@ -795,9 +775,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v2/aliases/request",
+              "raw": "{{apiBaseUrl}}/v2/aliases/request",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -821,9 +801,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/aliases/requests",
+              "raw": "{{apiBaseUrl}}/v2/aliases/requests",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -857,9 +837,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/requests",
+              "raw": "{{apiBaseUrl}}/v2/admin/aliases/requests",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -894,9 +874,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/approve/1/2",
+              "raw": "{{apiBaseUrl}}/v2/admin/aliases/approve/1/2",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -933,9 +913,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/aliases/reject/1/2",
+              "raw": "{{apiBaseUrl}}/v2/admin/aliases/reject/1/2",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -986,9 +966,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/v2/admin/members/merge",
+              "raw": "{{apiBaseUrl}}/v2/admin/members/merge",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "v2",
@@ -1018,9 +998,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/schedule",
+              "raw": "{{apiBaseUrl}}/schedule",
               "host": [
-                "{{baseUrl}}"
+                "{{apiBaseUrl}}"
               ],
               "path": [
                 "schedule"
