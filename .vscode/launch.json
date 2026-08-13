@@ -1,0 +1,59 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI: Debug API Server",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "src.main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "jinja": true,
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Python: Debug Current Test File",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "${file}",
+        "-v",
+        "-s"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Python: Debug All Pytests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests",
+        "-v",
+        "-s"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "name": "Python: Debug Current Script File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}
