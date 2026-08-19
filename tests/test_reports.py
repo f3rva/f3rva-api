@@ -142,6 +142,30 @@ def test_get_attendance_leaderboard_sorted_by_ratio(client: TestClient, db_sessi
     assert data[0]["qRatio"] == 1.0
 
 
+def test_get_attendance_leaderboard_min_thresholds_and_exclusion(client: TestClient, db_session: Session) -> None:
+    """Verify minQs and minWorkouts filters and exclusion of member 123."""
+    seed_test_report_data(db_session)
+    # Add member 123 (All PAX) to verify exclusion
+    m_all = Member(member_id=123, f3_name="All PAX")
+    db_session.add(m_all)
+    db_session.add(WorkoutPax(workout_id=301, member_id=123))
+    db_session.commit()
+
+    # Query with minQs=2: only Dingo (2 Qs) qualifies
+    response = client.get("/v2/reports/attendance?minQs=2")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["f3Name"] == "Dingo"
+
+    # Query with minWorkouts=3: Dingo (4) and Lab Rat (3) qualify, All PAX (123) is excluded
+    response2 = client.get("/v2/reports/attendance?minWorkouts=3")
+    assert response2.status_code == 200
+    data2 = response2.json()
+    assert len(data2) == 2
+    assert all(m["memberId"] != 123 for m in data2)
+
+
 def test_get_attendance_leaderboard_date_range_filter(client: TestClient, db_session: Session) -> None:
     """Verify attendance leaderboard with date range filters."""
     seed_test_report_data(db_session)

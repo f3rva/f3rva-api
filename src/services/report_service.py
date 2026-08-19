@@ -40,7 +40,9 @@ class ReportService:
         start_date: str | None = None,
         end_date: str | None = None,
         sort_by: str = "workout",
-        limit: int = 50,
+        min_qs: int = 0,
+        min_workouts: int = 0,
+        limit: int | None = None,
     ) -> list[AttendanceLeaderboardItem]:
         """Generate member attendance and Q leaderboard within an optional date range."""
         query = text(
@@ -67,7 +69,8 @@ class ReportService:
                   AND (:end_date IS NULL OR w.WORKOUT_DATE <= :end_date)
                 GROUP BY wq.MEMBER_ID
             ) q_agg ON m.MEMBER_ID = q_agg.MEMBER_ID
-            WHERE COALESCE(pax_agg.WORKOUT_COUNT, 0) > 0 OR COALESCE(q_agg.Q_COUNT, 0) > 0
+            WHERE (COALESCE(pax_agg.WORKOUT_COUNT, 0) > 0 OR COALESCE(q_agg.Q_COUNT, 0) > 0)
+              AND m.MEMBER_ID != 123
             """
         )
         rows = (
@@ -81,6 +84,12 @@ class ReportService:
             w_count = int(r["WORKOUT_COUNT"])
             q_count = int(r["Q_COUNT"])
             ratio = round(q_count / w_count, 4) if w_count > 0 else 0.0
+
+            if min_qs > 0 and q_count < min_qs:
+                continue
+            if min_workouts > 0 and w_count < min_workouts:
+                continue
+
             items.append(
                 AttendanceLeaderboardItem(
                     memberId=r["MEMBER_ID"],
@@ -95,11 +104,13 @@ class ReportService:
         if sort_by == "q":
             items.sort(key=lambda x: (x.num_qs, x.num_workouts, x.f3_name), reverse=True)
         elif sort_by == "ratio":
-            items.sort(key=lambda x: (x.q_ratio, x.num_workouts, x.f3_name), reverse=True)
+            items.sort(key=lambda x: (x.q_ratio, x.num_qs, x.num_workouts, x.f3_name), reverse=True)
         else:  # default 'workout'
             items.sort(key=lambda x: (x.num_workouts, x.num_qs, x.f3_name), reverse=True)
 
-        return items[:limit]
+        if limit is not None and limit > 0:
+            return items[:limit]
+        return items
 
     @classmethod
     @timed_service
@@ -110,6 +121,9 @@ class ReportService:
         end_date: str | None = None,
     ) -> list[AOAttendanceSummary]:
         """Calculate total workouts, total PAX attendance, and average PAX per AO."""
+        effective_start = start_date or "2014-01-01"
+        effective_end = end_date or datetime.date.today().isoformat()
+
         query = text(
             """
             SELECT
@@ -121,15 +135,15 @@ class ReportService:
             FROM AO ao
             INNER JOIN WORKOUT_AO wao ON ao.AO_ID = wao.AO_ID
             INNER JOIN WORKOUT w ON wao.WORKOUT_ID = w.WORKOUT_ID
-            LEFT OUTER JOIN WORKOUT_PAX wp ON w.WORKOUT_ID = wp.WORKOUT_ID
-            WHERE (:start_date IS NULL OR w.WORKOUT_DATE >= :start_date)
-              AND (:end_date IS NULL OR w.WORKOUT_DATE <= :end_date)
+            LEFT OUTER JOIN WORKOUT_PAX wp ON w.WORKOUT_ID = wp.WORKOUT_ID AND wp.MEMBER_ID != 123
+            WHERE w.WORKOUT_DATE >= :start_date
+              AND w.WORKOUT_DATE <= :end_date
             GROUP BY ao.AO_ID, ao.DESCRIPTION, ao.SLUG
             ORDER BY ao.DESCRIPTION ASC
             """
         )
         rows = (
-            db.execute(query, {"start_date": start_date, "end_date": end_date})
+            db.execute(query, {"start_date": effective_start, "end_date": effective_end})
             .mappings()
             .all()
         )
@@ -175,6 +189,7 @@ class ReportService:
             INNER JOIN WORKOUT w ON wq.WORKOUT_ID = w.WORKOUT_ID
             INNER JOIN WORKOUT_AO wao ON w.WORKOUT_ID = wao.WORKOUT_ID
             WHERE wao.AO_ID = :ao_id
+              AND m.MEMBER_ID != 123
             GROUP BY m.MEMBER_ID, m.F3_NAME
             ORDER BY Q_COUNT DESC, m.F3_NAME ASC
             LIMIT :limit
@@ -197,6 +212,7 @@ class ReportService:
             INNER JOIN WORKOUT w ON wp.WORKOUT_ID = w.WORKOUT_ID
             INNER JOIN WORKOUT_AO wao ON w.WORKOUT_ID = wao.WORKOUT_ID
             WHERE wao.AO_ID = :ao_id
+              AND m.MEMBER_ID != 123
             GROUP BY m.MEMBER_ID, m.F3_NAME
             ORDER BY PAX_COUNT DESC, m.F3_NAME ASC
             LIMIT :limit
@@ -230,6 +246,9 @@ class ReportService:
         end_date: str | None = None,
     ) -> list[DayOfWeekAttendance]:
         """Aggregate total workouts and PAX attendance by day of the week (1=Sunday..7=Saturday)."""
+        effective_start = start_date or "2014-01-01"
+        effective_end = end_date or datetime.date.today().isoformat()
+
         query = text(
             """
             SELECT
@@ -237,14 +256,14 @@ class ReportService:
                 w.WORKOUT_DATE,
                 COUNT(wp.MEMBER_ID) AS PAX_COUNT
             FROM WORKOUT w
-            LEFT OUTER JOIN WORKOUT_PAX wp ON w.WORKOUT_ID = wp.WORKOUT_ID
-            WHERE (:start_date IS NULL OR w.WORKOUT_DATE >= :start_date)
-              AND (:end_date IS NULL OR w.WORKOUT_DATE <= :end_date)
+            LEFT OUTER JOIN WORKOUT_PAX wp ON w.WORKOUT_ID = wp.WORKOUT_ID AND wp.MEMBER_ID != 123
+            WHERE w.WORKOUT_DATE >= :start_date
+              AND w.WORKOUT_DATE <= :end_date
             GROUP BY w.WORKOUT_ID, w.WORKOUT_DATE
             """
         )
         rows = (
-            db.execute(query, {"start_date": start_date, "end_date": end_date})
+            db.execute(query, {"start_date": effective_start, "end_date": effective_end})
             .mappings()
             .all()
         )
@@ -290,6 +309,9 @@ class ReportService:
         cls, db: Session, member_id: int
     ) -> MemberDistributionResponse | None:
         """Retrieve breakdown of workouts attended and Q'd across all AOs for a member."""
+        if member_id == 123:
+            return None
+
         member_row = db.execute(
             text("SELECT MEMBER_ID, F3_NAME FROM MEMBER WHERE MEMBER_ID = :member_id"),
             {"member_id": member_id},
@@ -369,6 +391,7 @@ class ReportService:
             FROM WORKOUT_PAX wp
             INNER JOIN MEMBER m ON wp.MEMBER_ID = m.MEMBER_ID
             WHERE wp.WORKOUT_ID IN :workout_ids
+              AND m.MEMBER_ID != 123
             """
         ).bindparams(bindparam("workout_ids", expanding=True))
         pax_rows = (
