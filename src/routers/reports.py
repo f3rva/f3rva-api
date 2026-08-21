@@ -40,14 +40,18 @@ def get_attendance_leaderboard(
         Literal["workout", "q", "ratio"],
         Query(alias="sortBy", description="Ranking metric: workout (most workouts), q (most Qs), ratio (highest Q ratio)"),
     ] = "workout",
-    limit: Annotated[int, Query(ge=1, le=500, description="Max leaderboard results to return")] = 50,
+    min_qs: Annotated[int, Query(alias="minQs", ge=0, description="Minimum Qs required to qualify")] = 0,
+    min_workouts: Annotated[int, Query(alias="minWorkouts", ge=0, description="Minimum workouts attended required to qualify")] = 0,
+    limit: Annotated[int | None, Query(ge=1, le=5000, description="Max leaderboard results to return (omit for all active members)")] = None,
 ) -> list[AttendanceLeaderboardItem]:
-    """Retrieve attendance leaderboard with flexible date filters and sorting options."""
+    """Retrieve attendance leaderboard with flexible date filters, thresholds, and sorting options."""
     return ReportService.get_attendance_leaderboard(
         db=db,
         start_date=start_date,
         end_date=end_date,
         sort_by=sort_by,
+        min_qs=min_qs,
+        min_workouts=min_workouts,
         limit=limit,
     )
 
