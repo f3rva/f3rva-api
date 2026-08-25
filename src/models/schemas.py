@@ -205,6 +205,19 @@ class WorkoutCreatedResponse(BaseModel):
     id: int = Field(..., description="Unique ID of the newly created workout")
 
 
+class UpdateWorkoutRequest(AddWorkoutRequest):
+    """Structured payload for updating/refreshing an existing workout."""
+
+    workout_id: int | None = Field(default=None, alias="workoutId", description="Optional workout ID in payload body")
+
+
+class WorkoutUpdatedResponse(BaseModel):
+    """Response returned after updating a workout."""
+
+    id: int = Field(..., description="Unique ID of the updated workout")
+    message: str = Field(default="Workout updated successfully.", description="Status message")
+
+
 class DeleteWorkoutResponse(BaseModel):
     """Response returned after deleting a workout."""
 
