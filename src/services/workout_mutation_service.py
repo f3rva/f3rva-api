@@ -13,7 +13,9 @@ from src.models.schemas import (
     AddWorkoutRequest,
     AOInput,
     DeleteWorkoutResponse,
+    UpdateWorkoutRequest,
     WorkoutCreatedResponse,
+    WorkoutUpdatedResponse,
 )
 from src.models.workout import (
     AO,
@@ -29,13 +31,91 @@ from src.utils.logging import timed_service
 
 
 class WorkoutMutationService:
-    """Transactional creation and deletion of workouts and attendee records."""
+    """Transactional creation, update, and deletion of workouts and attendee records."""
 
     @classmethod
     @timed_service
     def add_workout(cls, db: Session, data: AddWorkoutRequest) -> WorkoutCreatedResponse:
         """Add a workout directly with structured payload data."""
-        # 1. Parse and validate workout date
+        parsed_date, q_names, pax_names = cls._validate_workout_input(data)
+
+        # Create and persist the WORKOUT entity
+        new_workout = Workout(
+            workout_date=parsed_date,
+            title=data.title,
+            author=data.author,
+            slug=data.slug,
+            backblast_url=data.url,
+        )
+        db.add(new_workout)
+        db.flush()
+
+        wid = new_workout.workout_id
+
+        cls._save_workout_children(
+            db=db,
+            workout_id=wid,
+            body=data.body,
+            aos=data.aos,
+            q_names=q_names,
+            pax_names=pax_names,
+        )
+
+        db.commit()
+        return WorkoutCreatedResponse(id=wid)
+
+    @classmethod
+    @timed_service
+    def update_workout(
+        cls, db: Session, workout_id: int, data: UpdateWorkoutRequest
+    ) -> WorkoutUpdatedResponse:
+        """Update/refresh an existing workout and replace its details, AOs, Qs, and PAX attendees."""
+        workout = db.execute(
+            select(Workout).where(Workout.workout_id == workout_id)
+        ).scalar_one_or_none()
+
+        if not workout:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"errorCode": 1001, "errorMessage": f"Workout with ID {workout_id} not found."},
+            )
+
+        parsed_date, q_names, pax_names = cls._validate_workout_input(data)
+
+        # Update workout core entity attributes
+        workout.workout_date = parsed_date
+        workout.title = data.title
+        workout.author = data.author
+        workout.slug = data.slug
+        workout.backblast_url = data.url
+        db.flush()
+
+        # Transactionally replace child associations
+        db.execute(delete(WorkoutDetails).where(WorkoutDetails.workout_id == workout_id))
+        db.execute(delete(WorkoutAO).where(WorkoutAO.workout_id == workout_id))
+        db.execute(delete(WorkoutQ).where(WorkoutQ.workout_id == workout_id))
+        db.execute(delete(WorkoutPax).where(WorkoutPax.workout_id == workout_id))
+
+        cls._save_workout_children(
+            db=db,
+            workout_id=workout_id,
+            body=data.body,
+            aos=data.aos,
+            q_names=q_names,
+            pax_names=pax_names,
+        )
+
+        db.commit()
+        return WorkoutUpdatedResponse(
+            id=workout_id,
+            message="Workout updated successfully.",
+        )
+
+    @classmethod
+    def _validate_workout_input(
+        cls, data: AddWorkoutRequest | UpdateWorkoutRequest
+    ) -> tuple[datetime.date, list[str], list[str]]:
+        """Validate date format, ensure date is not in future, and validate non-empty entities."""
         parsed_date = cls._parse_date_string(data.workout_date)
         if not parsed_date:
             raise HTTPException(
@@ -49,7 +129,6 @@ class WorkoutMutationService:
                 detail={"errorCode": 1003, "errorMessage": "Workout date cannot be in the future."},
             )
 
-        # 2. Parse Qs, PAX, and AOs
         q_names = cls._parse_name_list(data.qic)
         pax_names = cls._parse_name_list(data.pax)
 
@@ -69,29 +148,29 @@ class WorkoutMutationService:
                 detail={"errorCode": 1006, "errorMessage": "At least one AO is required."},
             )
 
-        # 3. Create and persist the WORKOUT entity
-        new_workout = Workout(
-            workout_date=parsed_date,
-            title=data.title,
-            author=data.author,
-            slug=data.slug,
-            backblast_url=data.url,
-        )
-        db.add(new_workout)
-        db.flush()
+        return parsed_date, q_names, pax_names
 
-        wid = new_workout.workout_id
+    @classmethod
+    def _save_workout_children(
+        cls,
+        db: Session,
+        workout_id: int,
+        body: str | None,
+        aos: list[AOInput] | list[str] | str,
+        q_names: list[str],
+        pax_names: list[str],
+    ) -> None:
+        """Persist details, AOs, Qs, and PAX attendees for a given workout ID."""
+        # 1. Persist HTML content / details if provided
+        if body:
+            db.add(WorkoutDetails(workout_id=workout_id, html_content=body))
 
-        # 4. Persist HTML content / details if provided
-        if data.body:
-            db.add(WorkoutDetails(workout_id=wid, html_content=data.body))
-
-        # 5. Persist AOs
+        # 2. Persist AOs
         ao_items: list[AOInput] = []
-        if isinstance(data.aos, str):
-            ao_items = [AOInput(name=a.strip()) for a in data.aos.split(",") if a.strip()]
-        elif isinstance(data.aos, list):
-            for item in data.aos:
+        if isinstance(aos, str):
+            ao_items = [AOInput(name=a.strip()) for a in aos.split(",") if a.strip()]
+        elif isinstance(aos, list):
+            for item in aos:
                 if isinstance(item, str):
                     if item.strip():
                         ao_items.append(AOInput(name=item.strip()))
@@ -100,20 +179,17 @@ class WorkoutMutationService:
 
         for ao_input in ao_items:
             ao_obj = cls._get_or_create_ao(db=db, ao_name=ao_input.name, ao_slug=ao_input.slug)
-            db.add(WorkoutAO(workout_id=wid, ao_id=ao_obj.ao_id))
+            db.add(WorkoutAO(workout_id=workout_id, ao_id=ao_obj.ao_id))
 
-        # 6. Persist Qs
+        # 3. Persist Qs
         for q_name in q_names:
             member = cls._get_or_create_member(db=db, name=q_name)
-            db.add(WorkoutQ(workout_id=wid, member_id=member.member_id))
+            db.add(WorkoutQ(workout_id=workout_id, member_id=member.member_id))
 
-        # 7. Persist PAX Attendees
+        # 4. Persist PAX Attendees
         for pax_name in pax_names:
             member = cls._get_or_create_member(db=db, name=pax_name)
-            db.add(WorkoutPax(workout_id=wid, member_id=member.member_id))
-
-        db.commit()
-        return WorkoutCreatedResponse(id=wid)
+            db.add(WorkoutPax(workout_id=workout_id, member_id=member.member_id))
 
     @classmethod
     @timed_service

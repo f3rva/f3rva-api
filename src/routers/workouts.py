@@ -12,8 +12,10 @@ from src.models.schemas import (
     AddWorkoutRequest,
     DeleteWorkoutResponse,
     ErrorResponse,
+    UpdateWorkoutRequest,
     WorkoutCreatedResponse,
     WorkoutResponse,
+    WorkoutUpdatedResponse,
 )
 from src.services.workout_mutation_service import WorkoutMutationService
 from src.services.workout_service import WorkoutService
@@ -187,6 +189,27 @@ def get_workout_by_id(
             detail={"errorCode": 1001, "errorMessage": "Workout not found"},
         )
     return workout
+
+
+@router.put(
+    "/{workout_id}",
+    response_model=WorkoutUpdatedResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update/refresh workout by ID",
+    description="Updates an existing workout and replaces its details, AOs, Qs, and PAX attendees.",
+    responses={
+        200: {"description": "Workout updated successfully."},
+        400: {"model": ErrorResponse, "description": "Invalid input, missing required fields, or future workout date."},
+        404: {"model": ErrorResponse, "description": "Workout not found."},
+    },
+)
+def update_workout(
+    db: DbSession,
+    workout_id: int,
+    payload: UpdateWorkoutRequest,
+) -> WorkoutUpdatedResponse:
+    """Update/refresh an existing workout by ID."""
+    return WorkoutMutationService.update_workout(db=db, workout_id=workout_id, data=payload)
 
 
 @router.delete(

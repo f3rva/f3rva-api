@@ -214,3 +214,128 @@ def test_delete_workout_not_found_404(client: TestClient) -> None:
     res = client.delete("/v2/workouts/99999", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 404
     assert res.json()["errorCode"] == 1001
+
+
+def test_update_workout_success(client: TestClient, db_session: Session) -> None:
+    """Verify PUT /v2/workouts/{id} successfully updates workout and replaces attendee records."""
+    # 1. Create original workout
+    create_res = client.post(
+        "/v2/workouts",
+        json={
+            "title": "Initial Beatdown",
+            "workoutDate": "2026-08-01",
+            "qic": "Dingo",
+            "pax": "Dingo, Lab Rat",
+            "aos": [{"name": "First Watch", "slug": "first-watch"}],
+            "body": "<p>Initial Body</p>",
+            "url": "https://f3rva.org/2026/08/01/initial-beatdown",
+            "author": "Dingo",
+            "slug": "initial-beatdown",
+        },
+    )
+    assert create_res.status_code == 201
+    workout_id = create_res.json()["id"]
+
+    # 2. Update workout with revised details
+    update_payload = {
+        "title": "Updated Beatdown",
+        "workoutDate": "2026-08-02",
+        "qic": ["Splinter", "Swag"],
+        "pax": ["Splinter", "Swag", "Bleeder"],
+        "aos": [{"name": "Spider Run", "slug": "spider-run"}],
+        "body": "<p>Updated Body with 100 Merkins</p>",
+        "url": "https://f3rva.org/2026/08/02/updated-beatdown",
+        "author": "Splinter",
+        "slug": "updated-beatdown",
+    }
+    update_res = client.put(f"/v2/workouts/{workout_id}", json=update_payload)
+    assert update_res.status_code == 200
+    data = update_res.json()
+    assert data["id"] == workout_id
+
+    # 3. Verify DB record updates
+    w = db_session.query(Workout).filter(Workout.workout_id == workout_id).first()
+    assert w is not None
+    assert w.title == "Updated Beatdown"
+    assert w.workout_date == datetime.date(2026, 8, 2)
+    assert w.author == "Splinter"
+    assert w.slug == "updated-beatdown"
+    assert w.backblast_url == "https://f3rva.org/2026/08/02/updated-beatdown"
+
+    # Details updated
+    det = db_session.query(WorkoutDetails).filter(WorkoutDetails.workout_id == workout_id).first()
+    assert det is not None
+    assert det.html_content == "<p>Updated Body with 100 Merkins</p>"
+
+    # Qs replaced (now 2 Qs: Splinter, Swag)
+    qs = db_session.query(WorkoutQ).filter(WorkoutQ.workout_id == workout_id).all()
+    assert len(qs) == 2
+
+    # PAX replaced (now 3 attendees)
+    pax = db_session.query(WorkoutPax).filter(WorkoutPax.workout_id == workout_id).all()
+    assert len(pax) == 3
+
+    # AOs replaced (now Spider Run)
+    aos = db_session.query(WorkoutAO).filter(WorkoutAO.workout_id == workout_id).all()
+    assert len(aos) == 1
+
+
+def test_update_workout_not_found_404(client: TestClient) -> None:
+    """Verify PUT /v2/workouts/99999 returns 404 for non-existent workout."""
+    payload = {
+        "title": "Non-existent",
+        "workoutDate": "2026-08-01",
+        "qic": ["Dingo"],
+        "pax": ["Dingo"],
+        "aos": [{"name": "Gridiron"}],
+    }
+    res = client.put("/v2/workouts/99999", json=payload)
+    assert res.status_code == 404
+    assert res.json()["errorCode"] == 1001
+
+
+def test_update_workout_validation_errors(client: TestClient) -> None:
+    """Verify PUT /v2/workouts/{id} rejects invalid date and future dates."""
+    # Create workout first
+    create_res = client.post(
+        "/v2/workouts",
+        json={
+            "title": "Validation Test",
+            "workoutDate": "2026-08-01",
+            "qic": ["Dingo"],
+            "pax": ["Dingo"],
+            "aos": [{"name": "Gridiron"}],
+        },
+    )
+    assert create_res.status_code == 201
+    workout_id = create_res.json()["id"]
+
+    # Invalid date format
+    res_invalid_date = client.put(
+        f"/v2/workouts/{workout_id}",
+        json={
+            "title": "Validation Test",
+            "workoutDate": "invalid-date",
+            "qic": ["Dingo"],
+            "pax": ["Dingo"],
+            "aos": [{"name": "Gridiron"}],
+        },
+    )
+    assert res_invalid_date.status_code == 400
+    assert res_invalid_date.json()["errorCode"] == 1002
+
+    # Future date
+    tomorrow = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+    res_future = client.put(
+        f"/v2/workouts/{workout_id}",
+        json={
+            "title": "Validation Test",
+            "workoutDate": tomorrow,
+            "qic": ["Dingo"],
+            "pax": ["Dingo"],
+            "aos": [{"name": "Gridiron"}],
+        },
+    )
+    assert res_future.status_code == 400
+    assert res_future.json()["errorCode"] == 1003
+

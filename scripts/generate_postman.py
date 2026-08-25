@@ -173,6 +173,32 @@ collection = {
                     "response": []
                 },
                 {
+                    "name": "Update / Refresh Workout",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json", "type": "text"},
+                            {"key": "Accept", "value": "application/json", "type": "text"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Updated Beatdown at First Watch\",\n  \"workoutDate\": \"2026-08-07\",\n  \"qic\": [\"Dingo\", \"Lab Rat\"],\n  \"pax\": [\"Dingo\", \"Lab Rat\", \"Splinter\", \"Swag\", \"Bleeder\"],\n  \"aos\": [\n    {\n      \"name\": \"First Watch\",\n      \"slug\": \"first-watch\"\n    },\n    {\n      \"name\": \"Spider Run\",\n      \"slug\": \"spider-run\"\n    }\n  ],\n  \"body\": \"<p>100 burpees, 100 merkins, and 5 miles.</p>\",\n  \"url\": \"https://f3rva.org/2026/08/07/beatdown-at-first-watch\",\n  \"author\": \"Dingo\",\n  \"slug\": \"beatdown-at-first-watch\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{apiBaseUrl}}/v2/workouts/101",
+                            "host": ["{{apiBaseUrl}}"],
+                            "path": ["v2", "workouts", "101"]
+                        },
+                        "description": "Updates an existing workout and replaces its details, AOs, Qs, and PAX attendees."
+                    },
+                    "response": []
+                },
+                {
                     "name": "Delete Workout (Protected)",
                     "request": {
                         "method": "DELETE",

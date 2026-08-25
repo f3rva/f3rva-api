@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "7311d18b-949c-4ace-a72b-cf5f18351f7c",
+    "_postman_id": "d078bec9-232c-4d33-92b3-8f8769e43fec",
     "name": "F3 API",
     "description": "Complete Postman collection for the F3 modern Python serverless REST API (Phases 1 through 6). Configured to use Postman Environments (apiBaseUrl, authToken).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -295,6 +295,46 @@
               ]
             },
             "description": "Creates a new workout record with structured AO objects (name + slug)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update / Refresh Workout",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Beatdown at First Watch\",\n  \"workoutDate\": \"2026-08-07\",\n  \"qic\": [\"Dingo\", \"Lab Rat\"],\n  \"pax\": [\"Dingo\", \"Lab Rat\", \"Splinter\", \"Swag\", \"Bleeder\"],\n  \"aos\": [\n    {\n      \"name\": \"First Watch\",\n      \"slug\": \"first-watch\"\n    },\n    {\n      \"name\": \"Spider Run\",\n      \"slug\": \"spider-run\"\n    }\n  ],\n  \"body\": \"<p>100 burpees, 100 merkins, and 5 miles.</p>\",\n  \"url\": \"https://f3rva.org/2026/08/07/beatdown-at-first-watch\",\n  \"author\": \"Dingo\",\n  \"slug\": \"beatdown-at-first-watch\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/v2/workouts/101",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "workouts",
+                "101"
+              ]
+            },
+            "description": "Updates an existing workout and replaces its details, AOs, Qs, and PAX attendees."
           },
           "response": []
         },
