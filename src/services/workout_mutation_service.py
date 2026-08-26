@@ -7,6 +7,7 @@ import re
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.models.schemas import (
@@ -39,6 +40,23 @@ class WorkoutMutationService:
         """Add a workout directly with structured payload data."""
         parsed_date, q_names, pax_names = cls._validate_workout_input(data)
 
+        # Pre-check for duplicate date and slug to prevent integrity conflicts
+        if data.slug:
+            existing = db.execute(
+                select(Workout).where(
+                    Workout.workout_date == parsed_date,
+                    Workout.slug == data.slug,
+                )
+            ).scalar_one_or_none()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "errorCode": 1007,
+                        "errorMessage": f"A workout on {parsed_date} with slug '{data.slug}' already exists (ID: {existing.workout_id}).",
+                    },
+                )
+
         # Create and persist the WORKOUT entity
         new_workout = Workout(
             workout_date=parsed_date,
@@ -48,21 +66,31 @@ class WorkoutMutationService:
             backblast_url=data.url,
         )
         db.add(new_workout)
-        db.flush()
 
-        wid = new_workout.workout_id
+        try:
+            db.flush()
+            wid = new_workout.workout_id
 
-        cls._save_workout_children(
-            db=db,
-            workout_id=wid,
-            body=data.body,
-            aos=data.aos,
-            q_names=q_names,
-            pax_names=pax_names,
-        )
+            cls._save_workout_children(
+                db=db,
+                workout_id=wid,
+                body=data.body,
+                aos=data.aos,
+                q_names=q_names,
+                pax_names=pax_names,
+            )
 
-        db.commit()
-        return WorkoutCreatedResponse(id=wid)
+            db.commit()
+            return WorkoutCreatedResponse(id=wid)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "errorCode": 1007,
+                    "errorMessage": f"A workout on {parsed_date} with slug '{data.slug}' already exists.",
+                },
+            ) from None
 
     @classmethod
     @timed_service
