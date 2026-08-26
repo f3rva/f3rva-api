@@ -136,6 +136,26 @@ def test_add_workout_future_date_rejected(client: TestClient) -> None:
     assert res.json()["errorCode"] == 1003
 
 
+def test_add_workout_duplicate_date_and_slug_rejected(client: TestClient) -> None:
+    """Verify POST /v2/workouts rejects duplicate date and slug with HTTP 409."""
+    payload = {
+        "title": "Initial Beatdown",
+        "workoutDate": "2026-08-01",
+        "qic": ["Dingo"],
+        "pax": ["Dingo"],
+        "aos": [{"name": "Gridiron"}],
+        "slug": "initial-beatdown",
+    }
+    res1 = client.post("/v2/workouts", json=payload)
+    assert res1.status_code == 201
+
+    # Attempt second insertion with same date and slug
+    res2 = client.post("/v2/workouts", json=payload)
+    assert res2.status_code == 409
+    assert res2.json()["errorCode"] == 1007
+    assert "already exists" in res2.json()["errorMessage"]
+
+
 def test_add_workout_missing_required_entities_rejected(client: TestClient) -> None:
     """Verify POST /v2/workouts rejects empty Qs, PAX, or AOs."""
     base_payload = {

@@ -60,6 +60,7 @@ def get_recent_workouts(
     responses={
         201: {"description": "Workout created successfully."},
         400: {"model": ErrorResponse, "description": "Invalid input, missing required fields, or future workout date."},
+        409: {"model": ErrorResponse, "description": "Workout with matching date and slug already exists."},
     },
 )
 def add_workout(
