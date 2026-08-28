@@ -108,11 +108,8 @@ class MemberService:
                 w.AUTHOR,
                 w.SLUG,
                 w.BACKBLAST_URL,
-                GROUP_CONCAT(DISTINCT ao.AO_ID) AS AO_IDS,
-                GROUP_CONCAT(DISTINCT ao.DESCRIPTION) AS AO_DESCRIPTIONS,
-                GROUP_CONCAT(DISTINCT ao.SLUG) AS AO_SLUGS,
-                GROUP_CONCAT(DISTINCT mq.MEMBER_ID) AS Q_IDS,
-                GROUP_CONCAT(DISTINCT mq.F3_NAME) AS Q_NAMES,
+                GROUP_CONCAT(DISTINCT CONCAT(ao.AO_ID, ':::', ao.DESCRIPTION, ':::', COALESCE(ao.SLUG, ''))) AS AO_AGG,
+                GROUP_CONCAT(DISTINCT CONCAT(mq.MEMBER_ID, ':::', mq.F3_NAME)) AS Q_AGG,
                 COUNT(DISTINCT wp_all.MEMBER_ID) AS PAX_COUNT
             FROM (
                 SELECT w_inner.WORKOUT_ID, w_inner.WORKOUT_DATE, w_inner.TITLE, w_inner.AUTHOR, w_inner.SLUG, w_inner.BACKBLAST_URL
@@ -129,7 +126,7 @@ class MemberService:
             GROUP BY
                 w.WORKOUT_ID, w.WORKOUT_DATE, w.TITLE, w.AUTHOR, w.SLUG, w.BACKBLAST_URL
             ORDER BY
-                w.WORKOUT_DATE DESC, AO_DESCRIPTIONS ASC
+                w.WORKOUT_DATE DESC, w.WORKOUT_ID DESC
             """
         )
         pax_rows = db.execute(pax_workouts_query, {"member_id": member_id}).mappings().all()
@@ -145,11 +142,8 @@ class MemberService:
                 w.AUTHOR,
                 w.SLUG,
                 w.BACKBLAST_URL,
-                GROUP_CONCAT(DISTINCT ao.AO_ID) AS AO_IDS,
-                GROUP_CONCAT(DISTINCT ao.DESCRIPTION) AS AO_DESCRIPTIONS,
-                GROUP_CONCAT(DISTINCT ao.SLUG) AS AO_SLUGS,
-                GROUP_CONCAT(DISTINCT mq.MEMBER_ID) AS Q_IDS,
-                GROUP_CONCAT(DISTINCT mq.F3_NAME) AS Q_NAMES,
+                GROUP_CONCAT(DISTINCT CONCAT(ao.AO_ID, ':::', ao.DESCRIPTION, ':::', COALESCE(ao.SLUG, ''))) AS AO_AGG,
+                GROUP_CONCAT(DISTINCT CONCAT(mq.MEMBER_ID, ':::', mq.F3_NAME)) AS Q_AGG,
                 COUNT(DISTINCT wp_all.MEMBER_ID) AS PAX_COUNT
             FROM (
                 SELECT w_inner.WORKOUT_ID, w_inner.WORKOUT_DATE, w_inner.TITLE, w_inner.AUTHOR, w_inner.SLUG, w_inner.BACKBLAST_URL
@@ -166,7 +160,7 @@ class MemberService:
             GROUP BY
                 w.WORKOUT_ID, w.WORKOUT_DATE, w.TITLE, w.AUTHOR, w.SLUG, w.BACKBLAST_URL
             ORDER BY
-                w.WORKOUT_DATE DESC, AO_DESCRIPTIONS ASC
+                w.WORKOUT_DATE DESC, w.WORKOUT_ID DESC
             """
         )
         q_rows = db.execute(q_workouts_query, {"member_id": member_id}).mappings().all()
@@ -207,33 +201,25 @@ class MemberService:
     def _map_row_to_workout(row: RowMapping | Mapping[Any, Any]) -> WorkoutResponse:
         """Map raw database row mapping to strongly-typed WorkoutResponse DTO."""
         ao_list: list[AOSummary] = []
-        ao_ids_raw = row.get("AO_IDS")
-        ao_descs_raw = row.get("AO_DESCRIPTIONS")
-        ao_slugs_raw = row.get("AO_SLUGS")
-
-        if ao_descs_raw:
-            ao_ids = [int(i.strip()) for i in str(ao_ids_raw).split(",") if i.strip().isdigit()]
-            ao_descs = [d.strip() for d in str(ao_descs_raw).split(",") if d.strip()]
-            ao_slugs = (
-                [s.strip() for s in str(ao_slugs_raw).split(",")] if ao_slugs_raw else []
-            )
-
-            for idx, desc in enumerate(ao_descs):
-                ao_id = ao_ids[idx] if idx < len(ao_ids) else 0
-                ao_slug = ao_slugs[idx] if idx < len(ao_slugs) else None
-                ao_list.append(AOSummary(id=ao_id, description=desc, slug=ao_slug))
+        ao_agg_raw = row.get("AO_AGG")
+        if ao_agg_raw:
+            for item in str(ao_agg_raw).split(","):
+                parts = item.split(":::")
+                if len(parts) >= 2:
+                    ao_id = int(parts[0].strip()) if parts[0].strip().isdigit() else 0
+                    ao_desc = parts[1].strip()
+                    ao_slug = parts[2].strip() if len(parts) > 2 and parts[2].strip() else None
+                    ao_list.append(AOSummary(id=ao_id, description=ao_desc, slug=ao_slug))
 
         q_list: list[MemberSummary] = []
-        q_ids_raw = row.get("Q_IDS")
-        q_names_raw = row.get("Q_NAMES")
-
-        if q_names_raw:
-            q_ids = [int(i.strip()) for i in str(q_ids_raw).split(",") if i.strip().isdigit()]
-            q_names = [n.strip() for n in str(q_names_raw).split(",") if n.strip()]
-
-            for idx, name in enumerate(q_names):
-                q_id = q_ids[idx] if idx < len(q_ids) else 0
-                q_list.append(MemberSummary(memberId=q_id, f3Name=name))
+        q_agg_raw = row.get("Q_AGG")
+        if q_agg_raw:
+            for item in str(q_agg_raw).split(","):
+                parts = item.split(":::")
+                if len(parts) >= 2:
+                    q_id = int(parts[0].strip()) if parts[0].strip().isdigit() else 0
+                    q_name = parts[1].strip()
+                    q_list.append(MemberSummary(memberId=q_id, f3Name=q_name))
 
         workout_date_val = row["WORKOUT_DATE"]
         workout_date_str = (

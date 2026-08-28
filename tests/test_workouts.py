@@ -79,17 +79,17 @@ def test_get_recent_workouts(client: TestClient, db_session: Session) -> None:
     assert data[0]["title"] == "Beatdown at Gridiron"
     assert data[0]["paxCount"] == 3
 
-    # Assert multiple AOs are completely preserved with zero data loss
+    # Assert multiple AOs are completely preserved with correct ID-to-description mapping
     assert len(data[0]["ao"]) == 2
-    ao_names = [a["description"] for a in data[0]["ao"]]
-    assert "Gridiron" in ao_names
-    assert "Dogpile" in ao_names
+    ao_dict = {a["id"]: a["description"] for a in data[0]["ao"]}
+    assert ao_dict[1] == "Gridiron"
+    assert ao_dict[2] == "Dogpile"
 
-    # Assert multiple Qs are completely preserved
+    # Assert multiple Qs are completely preserved with correct ID-to-name mapping
     assert len(data[0]["q"]) == 2
-    q_names = [q["f3Name"] for q in data[0]["q"]]
-    assert "Dingo" in q_names
-    assert "Lab Rat" in q_names
+    q_dict = {q["memberId"]: q["f3Name"] for q in data[0]["q"]}
+    assert q_dict[1] == "Dingo"
+    assert q_dict[2] == "Lab Rat"
 
 
 def test_get_workouts_pagination_empty(client: TestClient, db_session: Session) -> None:
