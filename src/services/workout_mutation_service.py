@@ -11,6 +11,7 @@ from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from src.config.settings import get_settings
 from src.models.schemas import (
     AddWorkoutRequest,
     AOInput,
@@ -29,7 +30,6 @@ from src.models.workout import (
     WorkoutPax,
     WorkoutQ,
 )
-from src.config.settings import get_settings
 from src.services.slack_notification_service import SlackNotificationService
 from src.utils.logging import timed_service
 
