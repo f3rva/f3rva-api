@@ -84,8 +84,8 @@ class SlackAuthService:
             or user_info.get("sub")
         )
         team_id = user_info.get("https://slack.com/team_id") or id_token_payload.get("https://slack.com/team_id")
-        name = user_info.get("name") or id_token_payload.get("name") or "PAX"
         email = user_info.get("email") or id_token_payload.get("email")
+        full_name = user_info.get("name") or id_token_payload.get("name") or "PAX"
         given_name = user_info.get("given_name") or id_token_payload.get("given_name")
 
         if not user_id or not team_id:
@@ -101,11 +101,37 @@ class SlackAuthService:
                 detail={"errorCode": 4003, "errorMessage": "Access denied: Unauthorized Slack workspace."},
             )
 
+        display_name = None
+        real_name = full_name or given_name
+
+        # If bot token is configured, query users.info to retrieve actual workspace display_name
+        if settings.slack_bot_token and user_id:
+            bot_user = cls._fetch_bot_user_profile(settings.slack_bot_token, user_id)
+            if bot_user:
+                profile = bot_user.get("profile", {})
+                display_name = (
+                    profile.get("display_name")
+                    or profile.get("display_name_normalized")
+                )
+                real_name = profile.get("real_name") or bot_user.get("real_name") or real_name
+                if not email:
+                    email = profile.get("email")
+
+        # Fallback priority for display_name
+        if not display_name:
+            display_name = (
+                user_info.get("nickname")
+                or user_info.get("preferred_username")
+                or id_token_payload.get("nickname")
+                or id_token_payload.get("preferred_username")
+                or full_name
+            )
+
         return SlackUserProfile(
             slackUserId=user_id,
             slackTeamId=team_id,
-            displayName=name,
-            realName=given_name,
+            displayName=display_name,
+            realName=real_name,
             email=email,
         )
 
@@ -288,6 +314,25 @@ class SlackAuthService:
                 return MemberSummary(memberId=aliased_member.member_id, f3Name=aliased_member.f3_name)
 
         return None
+
+    @classmethod
+    def _fetch_bot_user_profile(cls, bot_token: str, user_id: str) -> dict[str, Any]:
+        """Fetch full Slack user profile via users.info using bot token."""
+        url = f"https://slack.com/api/users.info?user={urllib.parse.quote(user_id)}"
+        req = urllib.request.Request(
+            url=url,
+            headers={"Authorization": f"Bearer {bot_token}"},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                body = response.read().decode("utf-8")
+                res: Any = json.loads(body)
+                if isinstance(res, dict) and res.get("ok"):
+                    return dict(res.get("user", {}))
+                return {}
+        except Exception:
+            return {}
 
     @classmethod
     def _fetch_user_info(cls, access_token: str) -> dict[str, Any]:
