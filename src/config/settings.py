@@ -95,6 +95,13 @@ class Settings(BaseSettings):
     f3_region_id: str = Field(default="25240", description="F3 Nation Region ID for Richmond VA")
     client_id: str = Field(default="f3rva-website", description="Client identifier for upstream F3 Nation API")
 
+    # Slack Integration & OAuth
+    slack_client_id: str | None = Field(default=None, description="Slack App Client ID for OAuth")
+    slack_client_secret: str | None = Field(default=None, description="Slack App Client Secret for OAuth")
+    slack_bot_token: str | None = Field(default=None, description="Slack App Bot User OAuth Token (xoxb-...)")
+    slack_allowed_team_id: str | None = Field(default=None, description="Allowed Slack Team/Workspace ID (e.g., f3-rva-workspace)")
+    slack_backblast_channel_id: str | None = Field(default=None, description="Slack Channel ID for #backblasts notifications")
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -15,6 +15,7 @@ from src.models.workout import (
     Member,
     MemberAlias,
     MemberAliasAudit,
+    MemberSlack,
     Workout,
     WorkoutAO,
     WorkoutPax,
@@ -250,3 +251,48 @@ def test_jwt_invalid_token_rejected(client: TestClient) -> None:
     response = client.get("/v2/admin/aliases/requests", headers={"Authorization": "Bearer invalid.malformed.token"})
     assert response.status_code == 401
     assert response.json()["errorCode"] == 4010
+
+
+def test_merge_members_resolves_member_slack_conflicts(client: TestClient, db_session: Session) -> None:
+    """Verify when both primary and alias have MEMBER_SLACK records for same team, primary is kept and alias deleted."""
+    seed_admin_test_data(db_session)
+
+    # Primary member 1 has Slack record in T_PROD
+    db_session.add(MemberSlack(member_id=1, slack_team_id="T_PROD", slack_user_id="U_PRIMARY", slack_display_name="Dingo"))
+    # Alias member 2 also has Slack record in T_PROD
+    db_session.add(MemberSlack(member_id=2, slack_team_id="T_PROD", slack_user_id="U_ALIAS", slack_display_name="Wild Dingo"))
+    db_session.commit()
+
+    token = create_access_token(data={"sub": "admin"})
+    merge_res = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert merge_res.status_code == 200
+
+    # Verify primary Slack mapping is retained and alias Slack mapping deleted
+    assert db_session.query(MemberSlack).filter_by(slack_team_id="T_PROD", slack_user_id="U_PRIMARY").first() is not None
+    assert db_session.query(MemberSlack).filter_by(slack_team_id="T_PROD", slack_user_id="U_ALIAS").first() is None
+
+
+def test_merge_members_reassigns_single_member_slack(client: TestClient, db_session: Session) -> None:
+    """Verify when only alias has a MEMBER_SLACK record, it is cleanly reassigned to primary member."""
+    seed_admin_test_data(db_session)
+
+    # Only alias member 2 has Slack record in T_PROD
+    db_session.add(MemberSlack(member_id=2, slack_team_id="T_PROD", slack_user_id="U_ALIAS_ONLY", slack_display_name="Wild Dingo"))
+    db_session.commit()
+
+    token = create_access_token(data={"sub": "admin"})
+    merge_res = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert merge_res.status_code == 200
+
+    # Verify alias Slack mapping reassigned to primary member 1
+    reassigned = db_session.query(MemberSlack).filter_by(slack_team_id="T_PROD", slack_user_id="U_ALIAS_ONLY").first()
+    assert reassigned is not None
+    assert reassigned.member_id == 1

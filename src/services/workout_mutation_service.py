@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import re
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select, text
@@ -28,6 +29,7 @@ from src.models.workout import (
     WorkoutPax,
     WorkoutQ,
 )
+from src.services.slack_notification_service import SlackNotificationService
 from src.utils.logging import timed_service
 
 
@@ -36,7 +38,9 @@ class WorkoutMutationService:
 
     @classmethod
     @timed_service
-    def add_workout(cls, db: Session, data: AddWorkoutRequest) -> WorkoutCreatedResponse:
+    def add_workout(
+        cls, db: Session, data: AddWorkoutRequest, current_user: dict[str, Any] | None = None
+    ) -> WorkoutCreatedResponse:
         """Add a workout directly with structured payload data."""
         parsed_date, q_names, pax_names = cls._validate_workout_input(data)
 
@@ -57,11 +61,13 @@ class WorkoutMutationService:
                     },
                 )
 
+        author_name = data.author or (current_user.get("f3_name") if current_user else None) or "Unknown"
+
         # Create and persist the WORKOUT entity
         new_workout = Workout(
             workout_date=parsed_date,
             title=data.title,
-            author=data.author,
+            author=author_name,
             slug=data.slug,
             backblast_url=data.url,
         )
@@ -81,6 +87,19 @@ class WorkoutMutationService:
             )
 
             db.commit()
+
+            # Dispatch Slack Notification
+            ao_names = [a.name if isinstance(a, AOInput) else str(a) for a in (data.aos if isinstance(data.aos, list) else [data.aos])]
+            SlackNotificationService.post_backblast_summary(
+                title=data.title,
+                workout_date=str(parsed_date),
+                url=data.url,
+                author=author_name,
+                aos=ao_names,
+                q_names=q_names,
+                pax_names=pax_names,
+            )
+
             return WorkoutCreatedResponse(id=wid)
         except IntegrityError:
             db.rollback()
@@ -95,7 +114,7 @@ class WorkoutMutationService:
     @classmethod
     @timed_service
     def update_workout(
-        cls, db: Session, workout_id: int, data: UpdateWorkoutRequest
+        cls, db: Session, workout_id: int, data: UpdateWorkoutRequest, current_user: dict[str, Any] | None = None
     ) -> WorkoutUpdatedResponse:
         """Update/refresh an existing workout and replace its details, AOs, Qs, and PAX attendees."""
         workout = db.execute(
@@ -108,12 +127,34 @@ class WorkoutMutationService:
                 detail={"errorCode": 1001, "errorMessage": f"Workout with ID {workout_id} not found."},
             )
 
+        # Enforce edit permissions: Admin or Original Author / Leader
+        if current_user and current_user.get("role") != "admin":
+            user_f3_name = current_user.get("f3_name", "").strip().lower()
+            user_member_id = current_user.get("member_id")
+
+            existing_qs = db.execute(
+                select(WorkoutQ.member_id).where(WorkoutQ.workout_id == workout_id)
+            ).scalars().all()
+
+            is_author = bool(workout.author and workout.author.strip().lower() == user_f3_name)
+            is_q = bool(user_member_id and user_member_id in existing_qs)
+
+            if not (is_author or is_q):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "errorCode": 4003,
+                        "errorMessage": "You are not authorized to edit this workout. Only the original author or an administrator can make changes.",
+                    },
+                )
+
         parsed_date, q_names, pax_names = cls._validate_workout_input(data)
 
         # Update workout core entity attributes
         workout.workout_date = parsed_date
         workout.title = data.title
-        workout.author = data.author
+        if data.author:
+            workout.author = data.author
         workout.slug = data.slug
         workout.backblast_url = data.url
         db.flush()
@@ -134,6 +175,19 @@ class WorkoutMutationService:
         )
 
         db.commit()
+
+        # Dispatch Slack Notification
+        ao_names = [a.name if isinstance(a, AOInput) else str(a) for a in (data.aos if isinstance(data.aos, list) else [data.aos])]
+        SlackNotificationService.post_backblast_summary(
+            title=data.title,
+            workout_date=str(parsed_date),
+            url=data.url,
+            author=workout.author,
+            aos=ao_names,
+            q_names=q_names,
+            pax_names=pax_names,
+        )
+
         return WorkoutUpdatedResponse(
             id=workout_id,
             message="Workout updated successfully.",

@@ -43,22 +43,25 @@ f3rva-api/
 │   │   ├── database.py                # SQLAlchemy engine pool and session lifecycle management
 │   │   └── version.py                 # Dynamic Git tag and package version resolution
 │   ├── models/
-│   │   ├── workout.py                 # SQLAlchemy 2.0 ORM models (WORKOUT, AO, MEMBER, ALIAS, etc.)
+│   │   ├── workout.py                 # SQLAlchemy 2.0 ORM models (WORKOUT, AO, MEMBER, MEMBER_SLACK, etc.)
 │   │   └── schemas.py                 # Pydantic v2 request & response DTOs
 │   ├── routers/                       # Controller layer (thin routers)
 │   │   ├── schedule.py                # /schedule (live F3 Nation schedule proxy)
-│   │   ├── workouts.py                # /v2/workouts (read, filter, structured add, delete)
+│   │   ├── auth.py                    # /v2/auth (Slack OAuth login, link confirmation, user profile)
+│   │   ├── workouts.py                # /v2/workouts (read, filter, structured add/edit, delete, aos list)
 │   │   ├── members.py                 # /v2/members (alphabetical list, profiles, stats, lookup)
 │   │   ├── reports.py                 # /v2/reports (attendance, AO averages, day-of-week, streakers)
 │   │   ├── aliases.py                 # /v2/aliases (self-service claim requests)
 │   │   └── admin.py                   # /v2/admin (JWT login, approve, reject, merge records)
 │   ├── services/                      # Core business logic layer
 │   │   ├── schedule_service.py        # Upstream F3 Nation API integration & event transformations
+│   │   ├── slack_auth_service.py      # Slack OAuth OIDC exchange, team ID verification & member linking
+│   │   ├── slack_notification_service.py# Block Kit backblast summaries dispatched to #backblasts
 │   │   ├── workout_service.py         # Derived table pagination & backblast queries (<15ms)
-│   │   ├── workout_mutation_service.py# Structured workout additions & transactional deletions
+│   │   ├── workout_mutation_service.py# Structured workout additions, author updates & transactional deletions
 │   │   ├── member_service.py          # Member profiles, attendance stats & search
 │   │   ├── report_service.py          # Streaker calculation & attendance aggregations
-│   │   └── alias_service.py           # Multi-table atomic alias merger & audit transactions
+│   │   └── alias_service.py           # Multi-table atomic alias merger, audit & MEMBER_SLACK reconciliation
 │   └── utils/
 │       ├── logging.py                 # Structured latency tracing decorator (@timed_service)
 │       └── security.py                # JWT creation, decoding, and Bearer token dependency
@@ -66,14 +69,16 @@ f3rva-api/
     ├── conftest.py                    # SQLite in-memory fixtures & TestClient setup
     ├── test_health.py                 # Health checks, docs, CORS & Mangum Lambda adapter
     ├── test_schedule.py               # Schedule API transformation, caching, and error handling
+    ├── test_slack_auth.py             # Slack OAuth exchange, workspace enforcement & link confirmation
+    ├── test_slack_notifications.py    # Block Kit message formatting & Slack WebClient dispatch
     ├── test_workouts.py               # Workouts filtering, pagination & 404 handling
     ├── test_members.py                # Member stats, alias lookups & Q-ratio math
     ├── test_reports.py                # Streaker recursive algorithm & attendance reports
-    ├── test_workout_mutations.py      # Structured workout additions & protected deletions
-    ├── test_admin.py                  # JWT authentication, alias approvals & merger tests
+    ├── test_workout_mutations.py      # Structured workout additions, author permissions & deletions
+    ├── test_admin.py                  # JWT authentication, alias approvals, MEMBER_SLACK merges
     ├── test_database.py               # Database engine, session lifecycle & version tests
     ├── test_utils.py                  # Service latency tracking & logging decorator tests
-    └── run_tests.py                   # Standalone test runner script (75 tests)
+    └── run_tests.py                   # Standalone test runner script (104 tests)
 ```
 
 ---
@@ -176,3 +181,54 @@ Outputs:
 F3RVA-api-dev.CloudFrontDistributionId = E1A2B3C4D5E6F7
 ```
 Alternatively, in the AWS Console: Navigate to **CloudFront > Distributions** and look for the distribution with alternate domain name `api.dev.f3rva.org` (or origin `f3rva-dev-api-lambda`).
+
+---
+
+## 7. Slack OAuth & Notification Configuration
+
+### Slack App Permissions & Redirect URLs (api.slack.com/apps)
+1. **OAuth & Permissions > Redirect URLs**:
+   - Add frontend callback URLs:
+     - `http://localhost:3000/auth/slack/callback` (or your local frontend dev port)
+     - `https://dev.f3rva.org/auth/slack/callback`
+     - `https://f3rva.org/auth/slack/callback`
+   - Click **Save URLs**.
+2. **OAuth & Permissions > Scopes**:
+   - **Bot Token Scopes**:
+     - `chat:write` (dispatches Block Kit backblast summaries to the backblast channel)
+     - `users:read`
+     - `users:read.email`
+     - `users.profile:read`
+   - **User Token Scopes**:
+     - Leave **empty**.
+   > [!IMPORTANT]
+   > Do **NOT** add `openid`, `profile`, or `email` to Bot Token Scopes or User Token Scopes under Workspace Scopes. OpenID Connect scopes are requested dynamically during user sign-in via the authorize URL. Adding them to workspace token scopes will cause Slack to reject installation with `"Invalid permissions requested"`.
+3. **Reinstall App**:
+   - Click **Reinstall to Workspace** and authorize the updated bot scopes.
+
+### AWS SSM Parameter Store Variables
+Store the following parameters under `/f3rva/dev/` and `/f3rva/prod/`:
+
+| Parameter Name | Description | Example Dev | Example Prod |
+| :--- | :--- | :--- | :--- |
+| `slack_client_id` | Slack App Client ID | `123456.dev...` | `123456.prod...` |
+| `slack_client_secret` | Slack App Client Secret | `secret_dev...` | `secret_prod...` |
+| `slack_bot_token` | Bot User OAuth Token (`xoxb-...`) | `xoxb-dev...` | `xoxb-prod...` |
+| `slack_allowed_team_id` | Enforced Workspace Team ID | `T_DEV_123` | `T_PROD_456` |
+| `slack_backblast_channel_id` | Slack Channel ID for Backblasts | `C_DEV_TEST` | `C_PROD_BACKBLASTS` |
+
+### Database DDL: `MEMBER_SLACK`
+```sql
+CREATE TABLE IF NOT EXISTS MEMBER_SLACK (
+    MEMBER_ID INT NOT NULL,
+    SLACK_TEAM_ID VARCHAR(32) NOT NULL,
+    SLACK_USER_ID VARCHAR(32) NOT NULL,
+    SLACK_DISPLAY_NAME VARCHAR(255) NULL,
+    SLACK_REAL_NAME VARCHAR(255) NULL,
+    SLACK_EMAIL VARCHAR(255) NULL,
+    UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (SLACK_TEAM_ID, SLACK_USER_ID),
+    KEY idx_member_slack_member_id (MEMBER_ID),
+    CONSTRAINT fk_member_slack_member FOREIGN KEY (MEMBER_ID) REFERENCES MEMBER (MEMBER_ID) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```

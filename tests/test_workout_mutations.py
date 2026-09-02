@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,21 @@ from src.models.workout import AO, Workout, WorkoutAO, WorkoutDetails, WorkoutPa
 from src.utils.security import create_access_token
 
 
-def test_add_workout_with_aos_objects(client: TestClient, db_session: Session) -> None:
+@pytest.fixture
+def auth_headers() -> dict[str, str]:
+    """Generate default test bearer auth headers for Dingo."""
+    token = create_access_token(data={"sub": "U12345", "member_id": 1, "f3_name": "Dingo", "role": "member"})
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_headers() -> dict[str, str]:
+    """Generate admin test bearer auth headers."""
+    token = create_access_token(data={"sub": "admin", "role": "admin"})
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_add_workout_with_aos_objects(client: TestClient, db_session: Session, auth_headers: dict[str, str]) -> None:
     """Verify POST /v2/workouts creates workout with structured AO objects (name and slug)."""
     payload = {
         "title": "Beatdown at First Watch",
@@ -27,7 +42,7 @@ def test_add_workout_with_aos_objects(client: TestClient, db_session: Session) -
         "author": "Dingo",
         "slug": "beatdown-at-first-watch",
     }
-    response = client.post("/v2/workouts", json=payload)
+    response = client.post("/v2/workouts", json=payload, headers=auth_headers)
     assert response.status_code == 201
     data = response.json()
     assert "id" in data
@@ -61,7 +76,7 @@ def test_add_workout_with_aos_objects(client: TestClient, db_session: Session) -
     assert first_watch.slug == "first-watch"
 
 
-def test_add_workout_with_list_inputs(client: TestClient, db_session: Session) -> None:
+def test_add_workout_with_list_inputs(client: TestClient, db_session: Session, auth_headers: dict[str, str]) -> None:
     """Verify POST /v2/workouts creates workout when Qs, PAX are lists and AO has auto-derived slug."""
     payload = {
         "title": "Dogpile Ruck",
@@ -70,7 +85,7 @@ def test_add_workout_with_list_inputs(client: TestClient, db_session: Session) -
         "pax": ["Splinter", "Lab Rat"],
         "aos": [{"name": "Dogpile"}],
     }
-    response = client.post("/v2/workouts", json=payload)
+    response = client.post("/v2/workouts", json=payload, headers=auth_headers)
     assert response.status_code == 201
     data = response.json()
     workout_id = data["id"]
@@ -87,7 +102,7 @@ def test_add_workout_with_list_inputs(client: TestClient, db_session: Session) -
     assert dogpile.slug == "dogpile"
 
 
-def test_add_workout_date_formats(client: TestClient, db_session: Session) -> None:
+def test_add_workout_date_formats(client: TestClient, db_session: Session, auth_headers: dict[str, str]) -> None:
     """Verify POST /v2/workouts accepts varied valid date strings."""
     for date_str, expected in [
         ("08/07/2026", datetime.date(2026, 8, 7)),
@@ -100,14 +115,14 @@ def test_add_workout_date_formats(client: TestClient, db_session: Session) -> No
             "pax": ["Dingo"],
             "aos": [{"name": "Gridiron", "slug": "gridiron"}],
         }
-        res = client.post("/v2/workouts", json=payload)
+        res = client.post("/v2/workouts", json=payload, headers=auth_headers)
         assert res.status_code == 201
         w = db_session.query(Workout).filter(Workout.workout_id == res.json()["id"]).first()
         assert w is not None
         assert w.workout_date == expected
 
 
-def test_add_workout_invalid_date_rejected(client: TestClient) -> None:
+def test_add_workout_invalid_date_rejected(client: TestClient, auth_headers: dict[str, str]) -> None:
     """Verify POST /v2/workouts rejects invalid date format with 400."""
     payload = {
         "title": "Invalid Date Test",
@@ -116,12 +131,12 @@ def test_add_workout_invalid_date_rejected(client: TestClient) -> None:
         "pax": ["Dingo"],
         "aos": [{"name": "Gridiron"}],
     }
-    res = client.post("/v2/workouts", json=payload)
+    res = client.post("/v2/workouts", json=payload, headers=auth_headers)
     assert res.status_code == 400
     assert res.json()["errorCode"] == 1002
 
 
-def test_add_workout_future_date_rejected(client: TestClient) -> None:
+def test_add_workout_future_date_rejected(client: TestClient, auth_headers: dict[str, str]) -> None:
     """Verify POST /v2/workouts rejects future date with 400."""
     tomorrow = datetime.date.today() + datetime.timedelta(days=1)
     payload = {
@@ -131,12 +146,12 @@ def test_add_workout_future_date_rejected(client: TestClient) -> None:
         "pax": ["Dingo"],
         "aos": [{"name": "Gridiron"}],
     }
-    res = client.post("/v2/workouts", json=payload)
+    res = client.post("/v2/workouts", json=payload, headers=auth_headers)
     assert res.status_code == 400
     assert res.json()["errorCode"] == 1003
 
 
-def test_add_workout_duplicate_date_and_slug_rejected(client: TestClient) -> None:
+def test_add_workout_duplicate_date_and_slug_rejected(client: TestClient, auth_headers: dict[str, str]) -> None:
     """Verify POST /v2/workouts rejects duplicate date and slug with HTTP 409."""
     payload = {
         "title": "Initial Beatdown",
@@ -146,17 +161,17 @@ def test_add_workout_duplicate_date_and_slug_rejected(client: TestClient) -> Non
         "aos": [{"name": "Gridiron"}],
         "slug": "initial-beatdown",
     }
-    res1 = client.post("/v2/workouts", json=payload)
+    res1 = client.post("/v2/workouts", json=payload, headers=auth_headers)
     assert res1.status_code == 201
 
     # Attempt second insertion with same date and slug
-    res2 = client.post("/v2/workouts", json=payload)
+    res2 = client.post("/v2/workouts", json=payload, headers=auth_headers)
     assert res2.status_code == 409
     assert res2.json()["errorCode"] == 1007
     assert "already exists" in res2.json()["errorMessage"]
 
 
-def test_add_workout_missing_required_entities_rejected(client: TestClient) -> None:
+def test_add_workout_missing_required_entities_rejected(client: TestClient, auth_headers: dict[str, str]) -> None:
     """Verify POST /v2/workouts rejects empty Qs, PAX, or AOs."""
     base_payload = {
         "title": "Test",
@@ -169,25 +184,31 @@ def test_add_workout_missing_required_entities_rejected(client: TestClient) -> N
     # Missing Qs
     p1 = base_payload.copy()
     p1["qic"] = []
-    res1 = client.post("/v2/workouts", json=p1)
+    res1 = client.post("/v2/workouts", json=p1, headers=auth_headers)
     assert res1.status_code == 400
     assert res1.json()["errorCode"] == 1004
 
     # Missing PAX
     p2 = base_payload.copy()
     p2["pax"] = []
-    res2 = client.post("/v2/workouts", json=p2)
+    res2 = client.post("/v2/workouts", json=p2, headers=auth_headers)
     assert res2.status_code == 400
     assert res2.json()["errorCode"] == 1005
 
     # Missing AOs
     p3 = base_payload.copy()
     p3["aos"] = []
-    res3 = client.post("/v2/workouts", json=p3)
+    res3 = client.post("/v2/workouts", json=p3, headers=auth_headers)
     assert res3.status_code == 422 or res3.status_code == 400
 
 
-def test_delete_workout_success_with_bearer_token(client: TestClient, db_session: Session) -> None:
+def test_add_workout_unauthorized_without_token(client: TestClient) -> None:
+    """Verify POST /v2/workouts returns 401 when token is missing."""
+    res = client.post("/v2/workouts", json={"title": "No Token"})
+    assert res.status_code == 401
+
+
+def test_delete_workout_success_with_bearer_token(client: TestClient, db_session: Session, auth_headers: dict[str, str], admin_headers: dict[str, str]) -> None:
     """Verify DELETE /v2/workouts/{id} removes workout and all child records when authenticated."""
     # First create a workout
     create_res = client.post(
@@ -200,15 +221,15 @@ def test_delete_workout_success_with_bearer_token(client: TestClient, db_session
             "aos": [{"name": "Gridiron"}],
             "body": "<p>Content</p>",
         },
+        headers=auth_headers,
     )
     assert create_res.status_code == 201
     workout_id = create_res.json()["id"]
 
     # Delete with admin bearer token
-    token = create_access_token(data={"sub": "admin"})
     delete_res = client.delete(
         f"/v2/workouts/{workout_id}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=admin_headers,
     )
     assert delete_res.status_code == 200
     assert delete_res.json()["workoutId"] == workout_id
@@ -228,17 +249,16 @@ def test_delete_workout_unauthorized_without_token(client: TestClient) -> None:
     assert res.json()["errorCode"] == 4010
 
 
-def test_delete_workout_not_found_404(client: TestClient) -> None:
+def test_delete_workout_not_found_404(client: TestClient, admin_headers: dict[str, str]) -> None:
     """Verify DELETE /v2/workouts/99999 returns 404 for non-existent workout."""
-    token = create_access_token(data={"sub": "admin"})
-    res = client.delete("/v2/workouts/99999", headers={"Authorization": f"Bearer {token}"})
+    res = client.delete("/v2/workouts/99999", headers=admin_headers)
     assert res.status_code == 404
     assert res.json()["errorCode"] == 1001
 
 
-def test_update_workout_success(client: TestClient, db_session: Session) -> None:
+def test_update_workout_success(client: TestClient, db_session: Session, auth_headers: dict[str, str]) -> None:
     """Verify PUT /v2/workouts/{id} successfully updates workout and replaces attendee records."""
-    # 1. Create original workout
+    # 1. Create original workout by Dingo
     create_res = client.post(
         "/v2/workouts",
         json={
@@ -252,11 +272,12 @@ def test_update_workout_success(client: TestClient, db_session: Session) -> None
             "author": "Dingo",
             "slug": "initial-beatdown",
         },
+        headers=auth_headers,
     )
     assert create_res.status_code == 201
     workout_id = create_res.json()["id"]
 
-    # 2. Update workout with revised details
+    # 2. Update workout with revised details (as author Dingo)
     update_payload = {
         "title": "Updated Beatdown",
         "workoutDate": "2026-08-02",
@@ -268,7 +289,7 @@ def test_update_workout_success(client: TestClient, db_session: Session) -> None
         "author": "Splinter",
         "slug": "updated-beatdown",
     }
-    update_res = client.put(f"/v2/workouts/{workout_id}", json=update_payload)
+    update_res = client.put(f"/v2/workouts/{workout_id}", json=update_payload, headers=auth_headers)
     assert update_res.status_code == 200
     data = update_res.json()
     assert data["id"] == workout_id
@@ -300,7 +321,44 @@ def test_update_workout_success(client: TestClient, db_session: Session) -> None
     assert len(aos) == 1
 
 
-def test_update_workout_not_found_404(client: TestClient) -> None:
+def test_update_workout_forbidden_for_non_author(client: TestClient, auth_headers: dict[str, str]) -> None:
+    """Verify PUT /v2/workouts/{id} rejects edits by a non-author, non-admin with 403."""
+    # Create workout by Dingo
+    create_res = client.post(
+        "/v2/workouts",
+        json={
+            "title": "Dingo's Workout",
+            "workoutDate": "2026-08-01",
+            "qic": ["Dingo"],
+            "pax": ["Dingo"],
+            "aos": [{"name": "First Watch"}],
+            "author": "Dingo",
+        },
+        headers=auth_headers,
+    )
+    assert create_res.status_code == 201
+    workout_id = create_res.json()["id"]
+
+    # Try to edit as Attila (not author, not admin)
+    attila_token = create_access_token(data={"sub": "U999", "member_id": 999, "f3_name": "Attila", "role": "member"})
+    attila_headers = {"Authorization": f"Bearer {attila_token}"}
+
+    update_res = client.put(
+        f"/v2/workouts/{workout_id}",
+        json={
+            "title": "Attila's Hijack",
+            "workoutDate": "2026-08-01",
+            "qic": ["Attila"],
+            "pax": ["Attila"],
+            "aos": [{"name": "First Watch"}],
+        },
+        headers=attila_headers,
+    )
+    assert update_res.status_code == 403
+    assert update_res.json()["errorCode"] == 4003
+
+
+def test_update_workout_not_found_404(client: TestClient, auth_headers: dict[str, str]) -> None:
     """Verify PUT /v2/workouts/99999 returns 404 for non-existent workout."""
     payload = {
         "title": "Non-existent",
@@ -309,12 +367,12 @@ def test_update_workout_not_found_404(client: TestClient) -> None:
         "pax": ["Dingo"],
         "aos": [{"name": "Gridiron"}],
     }
-    res = client.put("/v2/workouts/99999", json=payload)
+    res = client.put("/v2/workouts/99999", json=payload, headers=auth_headers)
     assert res.status_code == 404
     assert res.json()["errorCode"] == 1001
 
 
-def test_update_workout_validation_errors(client: TestClient) -> None:
+def test_update_workout_validation_errors(client: TestClient, auth_headers: dict[str, str]) -> None:
     """Verify PUT /v2/workouts/{id} rejects invalid date and future dates."""
     # Create workout first
     create_res = client.post(
@@ -325,7 +383,9 @@ def test_update_workout_validation_errors(client: TestClient) -> None:
             "qic": ["Dingo"],
             "pax": ["Dingo"],
             "aos": [{"name": "Gridiron"}],
+            "author": "Dingo",
         },
+        headers=auth_headers,
     )
     assert create_res.status_code == 201
     workout_id = create_res.json()["id"]
@@ -340,6 +400,7 @@ def test_update_workout_validation_errors(client: TestClient) -> None:
             "pax": ["Dingo"],
             "aos": [{"name": "Gridiron"}],
         },
+        headers=auth_headers,
     )
     assert res_invalid_date.status_code == 400
     assert res_invalid_date.json()["errorCode"] == 1002
@@ -355,6 +416,7 @@ def test_update_workout_validation_errors(client: TestClient) -> None:
             "pax": ["Dingo"],
             "aos": [{"name": "Gridiron"}],
         },
+        headers=auth_headers,
     )
     assert res_future.status_code == 400
     assert res_future.json()["errorCode"] == 1003

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.config.database import Base
@@ -40,6 +40,22 @@ class MemberAlias(Base):
         "MEMBER_ID", Integer, ForeignKey("MEMBER.MEMBER_ID"), primary_key=True
     )
     f3_alias: Mapped[str] = mapped_column("F3_ALIAS", String(255), primary_key=True)
+
+
+class MemberSlack(Base):
+    """Member Slack mapping entity with composite primary key (SLACK_TEAM_ID, SLACK_USER_ID)."""
+
+    __tablename__ = "MEMBER_SLACK"
+
+    slack_team_id: Mapped[str] = mapped_column("SLACK_TEAM_ID", String(32), primary_key=True)
+    slack_user_id: Mapped[str] = mapped_column("SLACK_USER_ID", String(32), primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        "MEMBER_ID", Integer, ForeignKey("MEMBER.MEMBER_ID", ondelete="CASCADE"), nullable=False
+    )
+    slack_display_name: Mapped[str | None] = mapped_column("SLACK_DISPLAY_NAME", String(255), nullable=True)
+    slack_real_name: Mapped[str | None] = mapped_column("SLACK_REAL_NAME", String(255), nullable=True)
+    slack_email: Mapped[str | None] = mapped_column("SLACK_EMAIL", String(255), nullable=True)
+    updated_at: Mapped[datetime.datetime | None] = mapped_column("UPDATED_AT", DateTime, nullable=True)
 
 
 class MemberAliasRequest(Base):

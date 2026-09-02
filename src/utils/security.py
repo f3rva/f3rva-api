@@ -43,20 +43,35 @@ def decode_access_token(token: str) -> dict[str, Any]:
         ) from None
 
 
-def get_current_admin(
+def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security_bearer),
-) -> str:
-    """FastAPI dependency to protect admin endpoints using Bearer JWT authentication."""
+) -> dict[str, Any]:
+    """FastAPI dependency to extract verified current authenticated user (member or admin)."""
     if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"errorCode": 4010, "errorMessage": "Missing Bearer Authorization header."},
         )
     payload = decode_access_token(credentials.credentials)
-    username = payload.get("sub")
-    if not username:
+    subject = payload.get("sub")
+    if not subject:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"errorCode": 4010, "errorMessage": "Invalid token subject."},
+        )
+    return payload
+
+
+def get_current_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_bearer),
+) -> str:
+    """FastAPI dependency to protect admin endpoints using Bearer JWT authentication."""
+    payload = get_current_user(credentials)
+    username = payload.get("sub")
+    role = payload.get("role")
+    if role != "admin" and not username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"errorCode": 4003, "errorMessage": "Admin role required."},
         )
     return str(username)
