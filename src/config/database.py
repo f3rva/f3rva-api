@@ -26,12 +26,15 @@ def get_engine() -> Engine:
     global _engine
     if _engine is None:
         settings = get_settings()
-        _engine = create_engine(
-            settings.database_url,
-            pool_pre_ping=settings.db_pool_pre_ping,
-            pool_recycle=settings.db_pool_recycle,
-            connect_args=settings.db_connect_args,
-        )
+        database_url = settings.database_url or "sqlite:///:memory:"
+        kwargs: dict[str, Any] = {}
+        if settings.db_pool_pre_ping is not None:
+            kwargs["pool_pre_ping"] = settings.db_pool_pre_ping
+        if settings.db_pool_recycle is not None:
+            kwargs["pool_recycle"] = settings.db_pool_recycle
+        if settings.db_connect_args is not None:
+            kwargs["connect_args"] = settings.db_connect_args
+        _engine = create_engine(database_url, **kwargs)
     return _engine
 
 

@@ -34,7 +34,7 @@ logging.getLogger("f3rva.services").setLevel(log_level)
 logger = logging.getLogger("f3rva-api")
 
 app = FastAPI(
-    title=settings.app_name,
+    title=settings.app_name or "F3 RVA API",
     version=APP_VERSION,
     description="Modern Python REST API for F3 RVA backblasts, member analytics, and schedule.",
     docs_url="/docs",

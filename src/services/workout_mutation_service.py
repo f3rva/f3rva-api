@@ -29,6 +29,7 @@ from src.models.workout import (
     WorkoutPax,
     WorkoutQ,
 )
+from src.config.settings import get_settings
 from src.services.slack_notification_service import SlackNotificationService
 from src.utils.logging import timed_service
 
@@ -63,13 +64,19 @@ class WorkoutMutationService:
 
         author_name = data.author or (current_user.get("f3_name") if current_user else None) or "Unknown"
 
+        settings = get_settings()
+        prefix = settings.backblast_url_prefix.rstrip("/") if settings.backblast_url_prefix else None
+        resolved_url = data.url or (
+            f"{prefix}/{parsed_date.strftime('%Y/%m/%d')}/{data.slug}" if (prefix and data.slug) else None
+        )
+
         # Create and persist the WORKOUT entity
         new_workout = Workout(
             workout_date=parsed_date,
             title=data.title,
             author=author_name,
             slug=data.slug,
-            backblast_url=data.url,
+            backblast_url=resolved_url,
         )
         db.add(new_workout)
 
@@ -93,14 +100,14 @@ class WorkoutMutationService:
             SlackNotificationService.post_backblast_summary(
                 title=data.title,
                 workout_date=str(parsed_date),
-                url=data.url,
+                url=resolved_url,
                 author=author_name,
                 aos=ao_names,
                 q_names=q_names,
                 pax_names=pax_names,
             )
 
-            return WorkoutCreatedResponse(id=wid)
+            return WorkoutCreatedResponse(id=wid, url=resolved_url)
         except IntegrityError:
             db.rollback()
             raise HTTPException(
@@ -150,13 +157,19 @@ class WorkoutMutationService:
 
         parsed_date, q_names, pax_names = cls._validate_workout_input(data)
 
+        settings = get_settings()
+        prefix = settings.backblast_url_prefix.rstrip("/") if settings.backblast_url_prefix else None
+        resolved_url = data.url or (
+            f"{prefix}/{parsed_date.strftime('%Y/%m/%d')}/{data.slug}" if (prefix and data.slug) else workout.backblast_url
+        )
+
         # Update workout core entity attributes
         workout.workout_date = parsed_date
         workout.title = data.title
         if data.author:
             workout.author = data.author
         workout.slug = data.slug
-        workout.backblast_url = data.url
+        workout.backblast_url = resolved_url
         db.flush()
 
         # Transactionally replace child associations
@@ -176,20 +189,9 @@ class WorkoutMutationService:
 
         db.commit()
 
-        # Dispatch Slack Notification
-        ao_names = [a.name if isinstance(a, AOInput) else str(a) for a in (data.aos if isinstance(data.aos, list) else [data.aos])]
-        SlackNotificationService.post_backblast_summary(
-            title=data.title,
-            workout_date=str(parsed_date),
-            url=data.url,
-            author=workout.author,
-            aos=ao_names,
-            q_names=q_names,
-            pax_names=pax_names,
-        )
-
         return WorkoutUpdatedResponse(
             id=workout_id,
+            url=resolved_url,
             message="Workout updated successfully.",
         )
 

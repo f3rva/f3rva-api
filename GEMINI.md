@@ -111,6 +111,7 @@ AI agents MUST adhere unconditionally to the **OWASP API Security Top 10** stand
   * Exception handlers must return sanitized, structured error responses (`{"errorCode": ..., "errorMessage": "..."}`).
   * **NEVER return raw database exception strings, connection URLs, hostnames, or passwords to the client in HTTP responses.**
 * **Safe URL Construction**: Always use `sqlalchemy.engine.URL.create(...)` to escape special characters in passwords and prevent connection string corruption.
+* **Zero Hardcoded Environment Defaults**: All environment settings in `Settings` (`BACKBLAST_URL_PREFIX`, `DATABASE_URL`, `JWT_SECRET_KEY`, admin credentials, etc.) must default to `None` and require explicit externalization via `.env` or AWS SSM Parameter Store.
 * **Security Headers**: CORS is restricted to authorized origins; `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` are enforced.
 
 ### I. OWASP API9: Improper Inventory & Version Management

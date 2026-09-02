@@ -40,36 +40,40 @@ class SlackNotificationService:
         q_str = ", ".join(q_names) if q_names else "None recorded"
         pax_count = len(pax_names)
         pax_preview = ", ".join(pax_names[:8]) + (f" (+{pax_count - 8} more)" if pax_count > 8 else "")
-        post_link = url or "https://f3rva.org"
+        prefix = settings.backblast_url_prefix.rstrip("/") if settings.backblast_url_prefix else None
+        post_link = url or prefix
+
+        header_text = f"<{post_link}|*{title}*>"
+        footer_text = f"Posted by *{author or 'PAX'}*"
 
         blocks: list[dict[str, Any]] = [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"🏃 *New Backblast:* <{post_link}|*{title}*>",
+                    "text": header_text,
                 },
             },
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": f"📅 *Date:*\n{workout_date}"},
-                    {"type": "mrkdwn", "text": f"📍 *AO:*\n{ao_str}"},
-                    {"type": "mrkdwn", "text": f"👑 *QIC:*\n{q_str}"},
-                    {"type": "mrkdwn", "text": f"👥 *PAX ({pax_count}):*\n{pax_preview}"},
+                    {"type": "mrkdwn", "text": f"*Date:* {workout_date}"},
+                    {"type": "mrkdwn", "text": f"*AO:* {ao_str}"},
+                    {"type": "mrkdwn", "text": f"*QIC:*\n{q_str}"},
+                    {"type": "mrkdwn", "text": f"*PAX ({pax_count}):*\n{pax_preview}"},
                 ],
             },
             {
                 "type": "context",
                 "elements": [
-                    {"type": "mrkdwn", "text": f"✍️ Posted by *{author or 'PAX'}* • <{post_link}|Read full backblast on f3rva.org>"},
+                    {"type": "mrkdwn", "text": footer_text},
                 ],
             },
         ]
 
         payload = {
             "channel": settings.slack_backblast_channel_id,
-            "text": f"New Backblast: {title} ({workout_date}) at {ao_str}",
+            "text": f"{title} ({workout_date}) at {ao_str}",
             "blocks": blocks,
         }
 

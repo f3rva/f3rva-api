@@ -203,6 +203,7 @@ class WorkoutCreatedResponse(BaseModel):
     """Response returned after creating a workout."""
 
     id: int = Field(..., description="Unique ID of the newly created workout")
+    url: str | None = Field(default=None, description="Direct URL to the published backblast")
 
 
 class UpdateWorkoutRequest(AddWorkoutRequest):
@@ -215,6 +216,7 @@ class WorkoutUpdatedResponse(BaseModel):
     """Response returned after updating a workout."""
 
     id: int = Field(..., description="Unique ID of the updated workout")
+    url: str | None = Field(default=None, description="Direct URL to the updated backblast")
     message: str = Field(default="Workout updated successfully.", description="Status message")
 
 

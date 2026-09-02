@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import datetime
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -24,6 +26,15 @@ def admin_headers() -> dict[str, str]:
     """Generate admin test bearer auth headers."""
     token = create_access_token(data={"sub": "admin", "role": "admin"})
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(autouse=True)
+def mock_slack_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure no live Slack notifications are ever dispatched during workout mutation tests."""
+    monkeypatch.setattr(
+        "src.services.workout_mutation_service.SlackNotificationService.post_backblast_summary",
+        lambda *args, **kwargs: True,
+    )
 
 
 def test_add_workout_with_aos_objects(client: TestClient, db_session: Session, auth_headers: dict[str, str]) -> None:
@@ -420,4 +431,27 @@ def test_update_workout_validation_errors(client: TestClient, auth_headers: dict
     )
     assert res_future.status_code == 400
     assert res_future.json()["errorCode"] == 1003
+
+
+def test_add_workout_auto_generates_url_from_settings_prefix(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str]
+) -> None:
+    """Verify POST /v2/workouts generates backblast_url using configurable BACKBLAST_URL_PREFIX."""
+    with patch("src.services.workout_mutation_service.get_settings") as mock_settings:
+        mock_settings.return_value.backblast_url_prefix = "https://custom.f3rva.org/"
+        payload = {
+            "title": "Custom Domain Test",
+            "workoutDate": "2026-08-09",
+            "qic": ["Dingo"],
+            "pax": ["Dingo"],
+            "aos": [{"name": "Gridiron"}],
+            "slug": "custom-domain-test",
+        }
+        res = client.post("/v2/workouts", json=payload, headers=auth_headers)
+        assert res.status_code == 201
+        wid = res.json()["id"]
+
+        w = db_session.query(Workout).filter(Workout.workout_id == wid).first()
+        assert w is not None
+        assert w.backblast_url == "https://custom.f3rva.org/2026/08/09/custom-domain-test"
 

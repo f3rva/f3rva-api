@@ -40,8 +40,10 @@ def admin_login(
 ) -> TokenResponse:
     """Authenticate administrator and return signed JWT bearer token."""
     settings = get_settings()
-    username_valid = hmac.compare_digest(payload.username, settings.admin_username)
-    password_valid = hmac.compare_digest(payload.password, settings.admin_password)
+    admin_user = settings.admin_username or ""
+    admin_pass = settings.admin_password or ""
+    username_valid = bool(admin_user) and hmac.compare_digest(payload.username, admin_user)
+    password_valid = bool(admin_pass) and hmac.compare_digest(payload.password, admin_pass)
 
     if not (username_valid and password_valid):
         raise HTTPException(

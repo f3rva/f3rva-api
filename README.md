@@ -105,6 +105,22 @@ pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
+### Environment Variables (.env)
+The API strictly reads configuration from OS environment variables, local `.env`, or AWS SSM Parameter Store without hardcoded defaults. The following variables must be configured:
+
+| Variable | Required | Description | Example / Default Value |
+| :--- | :--- | :--- | :--- |
+| `BACKBLAST_URL_PREFIX` | **Yes** | Base URL prefix for constructing backblast permalinks | `https://dev.f3rva.org` (dev) / `https://f3rva.org` (prod) |
+| `DATABASE_URL` | **Yes** | MySQL connection URL with URL-encoded password | `mysql+pymysql://user:pass@host:3306/db?charset=utf8mb4` |
+| `JWT_SECRET_KEY` | **Yes** | Secret key for signing admin and member JWT tokens | 32+ character random secret |
+| `ADMIN_USERNAME` | **Yes** | Admin authentication username | `admin` |
+| `ADMIN_PASSWORD` | **Yes** | Admin authentication password | High-entropy password |
+| `F3_NATION_API_KEY` | Optional | API key for upstream F3 Nation schedule sync | `f3_...` |
+| `SLACK_CLIENT_ID` | Optional | Slack App Client ID for Sign in with Slack | OAuth client ID |
+| `SLACK_CLIENT_SECRET` | Optional | Slack App Client Secret for Sign in with Slack | OAuth client secret |
+| `SLACK_BOT_TOKEN` | Optional | Slack Bot Token for backblast channel notifications | `xoxb-...` |
+| `SLACK_BACKBLAST_CHANNEL_ID` | Optional | Channel ID for backblast notification cards | `C0123456789` |
+
 ### Running the API Locally
 Start the development server with live auto-reload:
 ```bash
@@ -216,6 +232,7 @@ Store the following parameters under `/f3rva/dev/` and `/f3rva/prod/`:
 | `slack_bot_token` | Bot User OAuth Token (`xoxb-...`) | `xoxb-dev...` | `xoxb-prod...` |
 | `slack_allowed_team_id` | Enforced Workspace Team ID | `T_DEV_123` | `T_PROD_456` |
 | `slack_backblast_channel_id` | Slack Channel ID for Backblasts | `C_DEV_TEST` | `C_PROD_BACKBLASTS` |
+| `backblast_url_prefix` | Base URL prefix for backblast permalinks | `https://dev.f3rva.org` | `https://f3rva.org` |
 
 ### Database DDL: `MEMBER_SLACK`
 ```sql

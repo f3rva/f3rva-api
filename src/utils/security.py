@@ -17,19 +17,21 @@ security_bearer = HTTPBearer(auto_error=False)
 def create_access_token(data: dict[str, Any], expires_delta: datetime.timedelta | None = None) -> str:
     """Generate a signed HS256 JWT bearer token."""
     settings = get_settings()
+    jwt_secret = settings.jwt_secret_key or "jwt-secret-key-fallback"
     to_encode = data.copy()
     expire = datetime.datetime.now(datetime.UTC) + (
         expires_delta or datetime.timedelta(hours=24)
     )
     to_encode.update({"exp": expire, "iat": datetime.datetime.now(datetime.UTC)})
-    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm="HS256")
+    return jwt.encode(to_encode, jwt_secret, algorithm="HS256")
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
     """Decode and validate a signed JWT bearer token."""
     settings = get_settings()
+    jwt_secret = settings.jwt_secret_key or "jwt-secret-key-fallback"
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=["HS256"])
+        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
