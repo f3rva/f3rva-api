@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
 from src.models.schemas import AliasClaimRequest, AliasRequestResponse, ErrorResponse
 from src.services.alias_service import AliasService
+from src.utils.security import get_current_user
 
 router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[dict[str, Any], Depends(get_current_user)]
 
 
 @router.post(
@@ -25,6 +27,8 @@ DbSession = Annotated[Session, Depends(get_db)]
     responses={
         201: {"description": "Alias request submitted successfully."},
         400: {"model": ErrorResponse, "description": "Invalid member IDs provided."},
+        401: {"model": ErrorResponse, "description": "Authentication token missing or invalid."},
+        403: {"model": ErrorResponse, "description": "Forbidden - can only claim aliases for own profile."},
         404: {"model": ErrorResponse, "description": "Primary or alias member not found."},
         409: {"model": ErrorResponse, "description": "Pending alias request already exists."},
     },
@@ -32,8 +36,22 @@ DbSession = Annotated[Session, Depends(get_db)]
 def request_alias(
     db: DbSession,
     payload: AliasClaimRequest,
+    current_user: CurrentUser,
 ) -> AliasRequestResponse:
     """Submit a self-service alias claim request."""
+    # Enforce that regular members can only claim aliases for their own profile
+    role = current_user.get("role")
+    if role != "admin":
+        user_member_id = current_user.get("member_id")
+        if user_member_id is None or int(payload.primary_member_id) != int(user_member_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "errorCode": 4003,
+                    "errorMessage": "You can only submit alias claim requests for your own member profile.",
+                },
+            )
+
     return AliasService.request_alias(
         db=db,
         primary_id=payload.primary_member_id,
