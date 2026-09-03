@@ -237,3 +237,4 @@ Store the following parameters under `/f3rva/dev/` and `/f3rva/prod/`:
 | `backblast_url_prefix` | Base URL prefix for backblast permalinks | `https://dev.f3rva.org` | `https://f3rva.org` |
 | `db_pool_pre_ping` | *(Optional)* Proactive connection pinging | `true` | `true` |
 | `db_pool_recycle` | *(Optional)* Connection recycle timeout (seconds) | `300` | `300` |
+
