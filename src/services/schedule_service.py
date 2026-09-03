@@ -87,8 +87,8 @@ class ScheduleService:
                 detail={"errorCode": 5001, "errorMessage": "F3 Nation API Key is not configured."},
             )
 
-        region_id = settings.f3_region_id
-        client_id = settings.client_id
+        region_id = settings.f3_region_id or "25240"
+        client_id = settings.client_id or "f3rva-website"
         api_url = (
             f"https://api.f3nation.com/v1/event?regionIds={region_id}&statuses=active&pageSize=200"
             f"&sorting[0][id]=dayOfWeek&sorting[0][desc]=&sorting[1][id]=parent&sorting[1][desc]="
