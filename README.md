@@ -237,19 +237,3 @@ Store the following parameters under `/f3rva/dev/` and `/f3rva/prod/`:
 | `backblast_url_prefix` | Base URL prefix for backblast permalinks | `https://dev.f3rva.org` | `https://f3rva.org` |
 | `db_pool_pre_ping` | *(Optional)* Proactive connection pinging | `true` | `true` |
 | `db_pool_recycle` | *(Optional)* Connection recycle timeout (seconds) | `300` | `300` |
-
-### Database DDL: `MEMBER_SLACK`
-```sql
-CREATE TABLE IF NOT EXISTS MEMBER_SLACK (
-    MEMBER_ID INT NOT NULL,
-    SLACK_TEAM_ID VARCHAR(32) NOT NULL,
-    SLACK_USER_ID VARCHAR(32) NOT NULL,
-    SLACK_DISPLAY_NAME VARCHAR(255) NULL,
-    SLACK_REAL_NAME VARCHAR(255) NULL,
-    SLACK_EMAIL VARCHAR(255) NULL,
-    UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (SLACK_TEAM_ID, SLACK_USER_ID),
-    KEY idx_member_slack_member_id (MEMBER_ID),
-    CONSTRAINT fk_member_slack_member FOREIGN KEY (MEMBER_ID) REFERENCES MEMBER (MEMBER_ID) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
