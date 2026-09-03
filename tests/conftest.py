@@ -19,6 +19,16 @@ os.environ["PORT"] = "8000"
 os.environ["DEBUG"] = "false"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-unit-testing-32-chars-long"
+os.environ["ADMIN_USERNAME"] = "admin"
+os.environ["ADMIN_PASSWORD"] = "admin"
+os.environ["F3_REGION_ID"] = "25240"
+os.environ["CLIENT_ID"] = "f3rva-website"
+os.environ["BACKBLAST_URL_PREFIX"] = "https://f3rva.org"
+os.environ["SLACK_CLIENT_ID"] = ""
+os.environ["SLACK_CLIENT_SECRET"] = ""
+os.environ["SLACK_BOT_TOKEN"] = ""
+os.environ["SLACK_ALLOWED_TEAM_ID"] = ""
+os.environ["SLACK_BACKBLAST_CHANNEL_ID"] = ""
 
 from src.config.database import Base, get_db
 from src.main import app

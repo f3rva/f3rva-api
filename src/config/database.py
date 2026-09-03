@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from typing import Any
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -26,12 +27,28 @@ def get_engine() -> Engine:
     global _engine
     if _engine is None:
         settings = get_settings()
-        _engine = create_engine(
-            settings.database_url,
-            pool_pre_ping=settings.db_pool_pre_ping,
-            pool_recycle=settings.db_pool_recycle,
-            connect_args=settings.db_connect_args,
+        database_url = settings.database_url or "sqlite:///:memory:"
+        kwargs: dict[str, Any] = {}
+
+        # Enable pool_pre_ping to automatically reconnect on stale connections ("MySQL server has gone away")
+        kwargs["pool_pre_ping"] = (
+            settings.db_pool_pre_ping if settings.db_pool_pre_ping is not None else True
         )
+
+        # Recycle connections before remote server wait_timeout (defaults to 300s / 5 min)
+        kwargs["pool_recycle"] = (
+            settings.db_pool_recycle if settings.db_pool_recycle is not None else 300
+        )
+
+        # Enforce connection pool caps for non-sqlite production/dev databases
+        if not database_url.startswith("sqlite"):
+            kwargs["pool_size"] = 5
+            kwargs["max_overflow"] = 2
+            kwargs["pool_timeout"] = 10
+
+        if settings.db_connect_args is not None:
+            kwargs["connect_args"] = settings.db_connect_args
+        _engine = create_engine(database_url, **kwargs)
     return _engine
 
 

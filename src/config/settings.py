@@ -67,33 +67,37 @@ class Settings(BaseSettings):
     )
 
     # Core Application Configuration
-    app_name: str = Field(default="F3 RVA API", description="Application name displayed in OpenAPI and logs")
-    app_version: str = Field(default="0.1.0", description="Fallback application version")
-    environment: str = Field(default="development", description="Runtime environment name (development, testing, production)")
-    debug: bool = Field(default=False, description="Debug mode flag")
-    port: int = Field(default=8000, description="Server listen port")
+    app_name: str | None = Field(default=None, description="Application name displayed in OpenAPI and logs")
+    app_version: str | None = Field(default=None, description="Fallback application version")
+    environment: str | None = Field(default=None, description="Runtime environment name (development, testing, production)")
+    debug: bool | None = Field(default=None, description="Debug mode flag")
+    port: int | None = Field(default=None, description="Server listen port")
 
     # Database Configuration
-    database_url: str = Field(
-        default="mysql+pymysql://root:root@localhost:3306/f3rva_bd?charset=utf8mb4",
-        description="Full database connection URL",
-    )
-    db_pool_pre_ping: bool = Field(default=True, description="Enable connection pre-ping")
-    db_pool_recycle: int = Field(default=300, description="Connection recycle duration in seconds")
-    db_connect_args: dict[str, Any] = Field(default_factory=dict, description="Custom database engine connection arguments")
+    database_url: str | None = Field(default=None, description="Full database connection URL")
+    db_pool_pre_ping: bool | None = Field(default=None, description="Enable connection pre-ping")
+    db_pool_recycle: int | None = Field(default=None, description="Connection recycle duration in seconds")
+    db_connect_args: dict[str, Any] | None = Field(default=None, description="Custom database engine connection arguments")
 
     # Security & Admin Authentication
-    jwt_secret_key: str = Field(
-        default="change-me-in-production-jwt-secret-key-32-chars",
-        description="JWT secret key for signing admin authentication tokens",
-    )
-    admin_username: str = Field(default="admin", description="Admin username for management endpoints")
-    admin_password: str = Field(default="admin", description="Admin password for management endpoints")
+    jwt_secret_key: str | None = Field(default=None, description="JWT secret key for signing admin authentication tokens")
+    admin_username: str | None = Field(default=None, description="Admin username for management endpoints")
+    admin_password: str | None = Field(default=None, description="Admin password for management endpoints")
 
     # F3 Nation Schedule Integration
     f3_nation_api_key: str | None = Field(default=None, description="API Key for api.f3nation.com")
-    f3_region_id: str = Field(default="25240", description="F3 Nation Region ID for Richmond VA")
-    client_id: str = Field(default="f3rva-website", description="Client identifier for upstream F3 Nation API")
+    f3_region_id: str | None = Field(default=None, description="F3 Nation Region ID for Richmond VA")
+    client_id: str | None = Field(default=None, description="Client identifier for upstream F3 Nation API")
+
+    # Slack Integration & OAuth
+    slack_client_id: str | None = Field(default=None, description="Slack App Client ID for OAuth")
+    slack_client_secret: str | None = Field(default=None, description="Slack App Client Secret for OAuth")
+    slack_bot_token: str | None = Field(default=None, description="Slack App Bot User OAuth Token (xoxb-...)")
+    slack_allowed_team_id: str | None = Field(default=None, description="Allowed Slack Team/Workspace ID (e.g., f3-rva-workspace)")
+    slack_backblast_channel_id: str | None = Field(default=None, description="Slack Channel ID for #backblasts notifications")
+
+    # Backblast Configuration
+    backblast_url_prefix: str | None = Field(default=None, description="Public site base URL prefix for constructing backblast permalinks")
 
 
 @lru_cache

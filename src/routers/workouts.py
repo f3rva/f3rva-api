@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
 from src.models.schemas import (
     AddWorkoutRequest,
+    AOSummary,
     DeleteWorkoutResponse,
     ErrorResponse,
     UpdateWorkoutRequest,
@@ -17,13 +19,29 @@ from src.models.schemas import (
     WorkoutResponse,
     WorkoutUpdatedResponse,
 )
+from src.models.workout import AO
 from src.services.workout_mutation_service import WorkoutMutationService
 from src.services.workout_service import WorkoutService
-from src.utils.security import get_current_admin
+from src.utils.security import get_current_admin, get_current_user
 
 router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+@router.get(
+    "/aos",
+    response_model=list[AOSummary],
+    summary="Get all AOs",
+    description="Retrieves a list of all registered Areas of Operations (AOs) with their descriptions and slugs.",
+    responses={
+        200: {"description": "List of AOs."},
+    },
+)
+def get_all_aos(db: DbSession) -> list[AOSummary]:
+    """Retrieve all registered AOs ordered alphabetically."""
+    aos = db.execute(select(AO).order_by(AO.description.asc())).scalars().all()
+    return [AOSummary(id=a.ao_id, description=a.description, slug=a.slug) for a in aos]
 
 
 @router.get(
@@ -56,19 +74,21 @@ def get_recent_workouts(
     response_model=WorkoutCreatedResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Add workout with data",
-    description="Creates a new workout directly from structured payload data (title, workoutDate, qic, pax, aos, body, url, author, slug).",
+    description="Creates a new workout directly from structured payload data (Requires Bearer Token).",
     responses={
         201: {"description": "Workout created successfully."},
         400: {"model": ErrorResponse, "description": "Invalid input, missing required fields, or future workout date."},
+        401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
         409: {"model": ErrorResponse, "description": "Workout with matching date and slug already exists."},
     },
 )
 def add_workout(
     db: DbSession,
     payload: AddWorkoutRequest,
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> WorkoutCreatedResponse:
     """Add a new workout directly with structured payload data."""
-    return WorkoutMutationService.add_workout(db=db, data=payload)
+    return WorkoutMutationService.add_workout(db=db, data=payload, current_user=current_user)
 
 
 @router.get(
@@ -197,10 +217,12 @@ def get_workout_by_id(
     response_model=WorkoutUpdatedResponse,
     status_code=status.HTTP_200_OK,
     summary="Update/refresh workout by ID",
-    description="Updates an existing workout and replaces its details, AOs, Qs, and PAX attendees.",
+    description="Updates an existing workout and replaces its details, AOs, Qs, and PAX attendees (Requires Bearer Token).",
     responses={
         200: {"description": "Workout updated successfully."},
         400: {"model": ErrorResponse, "description": "Invalid input, missing required fields, or future workout date."},
+        401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
+        403: {"model": ErrorResponse, "description": "User is not authorized to edit this workout."},
         404: {"model": ErrorResponse, "description": "Workout not found."},
     },
 )
@@ -208,9 +230,12 @@ def update_workout(
     db: DbSession,
     workout_id: int,
     payload: UpdateWorkoutRequest,
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> WorkoutUpdatedResponse:
     """Update/refresh an existing workout by ID."""
-    return WorkoutMutationService.update_workout(db=db, workout_id=workout_id, data=payload)
+    return WorkoutMutationService.update_workout(
+        db=db, workout_id=workout_id, data=payload, current_user=current_user
+    )
 
 
 @router.delete(

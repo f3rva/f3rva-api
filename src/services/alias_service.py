@@ -7,7 +7,13 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from src.models.schemas import AliasRequestResponse, MemberSummary
-from src.models.workout import Member, MemberAlias, MemberAliasAudit, MemberAliasRequest
+from src.models.workout import (
+    Member,
+    MemberAlias,
+    MemberAliasAudit,
+    MemberAliasRequest,
+    MemberSlack,
+)
 from src.utils.logging import timed_service
 
 
@@ -235,7 +241,26 @@ class AliasService:
         if not existing_alias_map:
             db.add(MemberAlias(member_id=primary_id, f3_alias=alias_name))
 
-        # 6. Delete the duplicate member entity
+        # 6. Handle MEMBER_SLACK mapping merge
+        alias_slacks = db.execute(
+            select(MemberSlack).where(MemberSlack.member_id == alias_id)
+        ).scalars().all()
+        for a_slack in alias_slacks:
+            primary_slack = db.execute(
+                select(MemberSlack).where(
+                    MemberSlack.member_id == primary_id,
+                    MemberSlack.slack_team_id == a_slack.slack_team_id,
+                )
+            ).scalar_one_or_none()
+            if primary_slack:
+                # If primary already has a mapping for this team, delete the alias mapping
+                db.delete(a_slack)
+            else:
+                # Otherwise reassign alias mapping to primary member
+                a_slack.member_id = primary_id
+        db.flush()
+
+        # 7. Delete the duplicate member entity
         db.delete(alias_member)
         db.flush()
 

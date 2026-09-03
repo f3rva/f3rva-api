@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from src.config.database import get_db
 from src.config.settings import get_settings
 from src.config.version import get_version
-from src.routers import admin, aliases, members, reports, schedule, workouts
+from src.routers import admin, aliases, auth, members, reports, schedule, workouts
 
 settings = get_settings()
 APP_VERSION = get_version()
@@ -34,7 +34,7 @@ logging.getLogger("f3rva.services").setLevel(log_level)
 logger = logging.getLogger("f3rva-api")
 
 app = FastAPI(
-    title=settings.app_name,
+    title=settings.app_name or "F3 RVA API",
     version=APP_VERSION,
     description="Modern Python REST API for F3 RVA backblasts, member analytics, and schedule.",
     docs_url="/docs",
@@ -64,6 +64,7 @@ app.add_middleware(
 
 # Mount Domain Routers
 app.include_router(schedule.router, prefix="/schedule", tags=["Schedule"])
+app.include_router(auth.router, prefix="/v2/auth", tags=["Auth"])
 app.include_router(workouts.router, prefix="/v2/workouts", tags=["Workouts"])
 app.include_router(members.router, prefix="/v2/members", tags=["Members"])
 app.include_router(reports.router, prefix="/v2/reports", tags=["Reports"])

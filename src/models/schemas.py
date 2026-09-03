@@ -203,6 +203,7 @@ class WorkoutCreatedResponse(BaseModel):
     """Response returned after creating a workout."""
 
     id: int = Field(..., description="Unique ID of the newly created workout")
+    url: str | None = Field(default=None, description="Direct URL to the published backblast")
 
 
 class UpdateWorkoutRequest(AddWorkoutRequest):
@@ -215,6 +216,7 @@ class WorkoutUpdatedResponse(BaseModel):
     """Response returned after updating a workout."""
 
     id: int = Field(..., description="Unique ID of the updated workout")
+    url: str | None = Field(default=None, description="Direct URL to the updated backblast")
     message: str = Field(default="Workout updated successfully.", description="Status message")
 
 
@@ -297,3 +299,59 @@ class ErrorResponse(BaseModel):
 
     error_code: int = Field(..., alias="errorCode", serialization_alias="errorCode")
     error_message: str = Field(..., alias="errorMessage", serialization_alias="errorMessage")
+
+
+class SlackAuthRequest(BaseModel):
+    """Request payload for exchanging Slack OAuth code."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    code: str = Field(..., description="Authorization code from Slack OAuth redirect")
+    redirect_uri: str = Field(..., alias="redirectUri", description="OAuth redirect URI used in initiation")
+
+
+class SlackUserProfile(BaseModel):
+    """Slack User profile extracted during OAuth."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    slack_user_id: str = Field(..., alias="slackUserId", serialization_alias="slackUserId")
+    slack_team_id: str = Field(..., alias="slackTeamId", serialization_alias="slackTeamId")
+    display_name: str = Field(..., alias="displayName", serialization_alias="displayName")
+    real_name: str | None = Field(default=None, alias="realName", serialization_alias="realName")
+    email: str | None = Field(default=None)
+
+
+class AuthUserProfile(BaseModel):
+    """Authenticated user profile returned upon successful login."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name")
+    slack_user_id: str = Field(..., alias="slackUserId", serialization_alias="slackUserId")
+    role: str = Field(default="member", description="User role: member or admin")
+
+
+class SlackAuthResponse(BaseModel):
+    """Response returned from Slack OAuth handshake."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    is_linked: bool = Field(..., alias="isLinked", serialization_alias="isLinked", description="True if Slack user is linked to an F3 member")
+    access_token: str | None = Field(default=None, alias="accessToken", serialization_alias="accessToken")
+    token_type: str = Field(default="bearer", alias="tokenType", serialization_alias="tokenType")
+    expires_in: int | None = Field(default=None, alias="expiresIn", serialization_alias="expiresIn")
+    user: AuthUserProfile | None = Field(default=None, description="User profile if authenticated")
+    suggested_member: MemberSummary | None = Field(default=None, alias="suggestedMember", serialization_alias="suggestedMember")
+    slack_user: SlackUserProfile | None = Field(default=None, alias="slackUser", serialization_alias="slackUser")
+    temp_token: str | None = Field(default=None, alias="tempToken", serialization_alias="tempToken")
+
+
+class SlackConfirmLinkRequest(BaseModel):
+    """Request payload to confirm linking a Slack user to an F3 member profile."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    temp_token: str = Field(..., alias="tempToken", description="Temporary signed token from initial Slack handshake")
+    member_id: int = Field(..., alias="memberId", description="Selected F3 Member ID to link")

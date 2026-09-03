@@ -15,6 +15,7 @@ from src.models.workout import (
     Member,
     MemberAlias,
     MemberAliasAudit,
+    MemberSlack,
     Workout,
     WorkoutAO,
     WorkoutPax,
@@ -80,12 +81,14 @@ def test_admin_login_invalid_credentials(client: TestClient) -> None:
 
 
 def test_submit_alias_claim_request_success(client: TestClient, db_session: Session) -> None:
-    """Verify POST /v2/aliases/request creates pending alias request."""
+    """Verify POST /v2/aliases/request creates pending alias request for authenticated member."""
     seed_admin_test_data(db_session)
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
 
     response = client.post(
         "/v2/aliases/request",
         json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {member_token}"},
     )
     assert response.status_code == 201
     data = response.json()
@@ -94,13 +97,53 @@ def test_submit_alias_claim_request_success(client: TestClient, db_session: Sess
     assert data["aliasMember"]["memberId"] == 2
 
 
+def test_submit_alias_claim_request_unauthorized_without_token(client: TestClient) -> None:
+    """Verify POST /v2/aliases/request rejects unauthenticated requests with 401."""
+    response = client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+    )
+    assert response.status_code == 401
+    assert response.json()["errorCode"] == 4010
+
+
+def test_submit_alias_claim_request_forbidden_for_other_member(client: TestClient, db_session: Session) -> None:
+    """Verify POST /v2/aliases/request rejects non-admin claiming alias for a different member ID."""
+    seed_admin_test_data(db_session)
+    other_member_token = create_access_token(data={"sub": "slack:U2", "member_id": 2, "role": "member"})
+
+    response = client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 3},
+        headers={"Authorization": f"Bearer {other_member_token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["errorCode"] == 4003
+
+
+def test_submit_alias_claim_request_admin_allowed_for_any_member(client: TestClient, db_session: Session) -> None:
+    """Verify POST /v2/aliases/request allows admin to submit request for any member."""
+    seed_admin_test_data(db_session)
+    admin_token = create_access_token(data={"sub": "admin", "role": "admin"})
+
+    response = client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 201
+    assert response.json()["primaryMember"]["memberId"] == 1
+
+
 def test_submit_alias_claim_request_same_member_rejected(client: TestClient, db_session: Session) -> None:
     """Verify POST /v2/aliases/request rejects same member ID for primary and alias."""
     seed_admin_test_data(db_session)
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
 
     response = client.post(
         "/v2/aliases/request",
         json={"primaryMemberId": 1, "aliasMemberId": 1},
+        headers={"Authorization": f"Bearer {member_token}"},
     )
     assert response.status_code == 400
     data = response.json()
@@ -110,10 +153,12 @@ def test_submit_alias_claim_request_same_member_rejected(client: TestClient, db_
 def test_submit_alias_claim_request_unknown_member(client: TestClient, db_session: Session) -> None:
     """Verify POST /v2/aliases/request returns 404 if member does not exist."""
     seed_admin_test_data(db_session)
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
 
     response = client.post(
         "/v2/aliases/request",
         json={"primaryMemberId": 1, "aliasMemberId": 9999},
+        headers={"Authorization": f"Bearer {member_token}"},
     )
     assert response.status_code == 404
     data = response.json()
@@ -123,13 +168,22 @@ def test_submit_alias_claim_request_unknown_member(client: TestClient, db_sessio
 def test_submit_alias_claim_request_duplicate_conflict(client: TestClient, db_session: Session) -> None:
     """Verify POST /v2/aliases/request returns 409 if pending request already exists."""
     seed_admin_test_data(db_session)
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
 
     # First request
-    r1 = client.post("/v2/aliases/request", json={"primaryMemberId": 1, "aliasMemberId": 2})
+    r1 = client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
     assert r1.status_code == 201
 
     # Duplicate request
-    r2 = client.post("/v2/aliases/request", json={"primaryMemberId": 1, "aliasMemberId": 2})
+    r2 = client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
     assert r2.status_code == 409
     assert r2.json()["errorCode"] == 2004
 
@@ -137,7 +191,12 @@ def test_submit_alias_claim_request_duplicate_conflict(client: TestClient, db_se
 def test_get_public_pending_alias_requests(client: TestClient, db_session: Session) -> None:
     """Verify public GET /v2/aliases/requests returns pending requests without token."""
     seed_admin_test_data(db_session)
-    client.post("/v2/aliases/request", json={"primaryMemberId": 1, "aliasMemberId": 2})
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
+    client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
 
     response = client.get("/v2/aliases/requests")
     assert response.status_code == 200
@@ -156,10 +215,14 @@ def test_get_pending_alias_requests_unauthorized_without_token(client: TestClien
 def test_get_pending_alias_requests_with_jwt(client: TestClient, db_session: Session) -> None:
     """Verify GET /v2/admin/aliases/requests returns pending requests for authenticated admin."""
     seed_admin_test_data(db_session)
-    client.post("/v2/aliases/request", json={"primaryMemberId": 1, "aliasMemberId": 2})
+    admin_token = create_access_token(data={"sub": "admin", "role": "admin"})
+    client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
 
-    token = create_access_token(data={"sub": "admin"})
-    response = client.get("/v2/admin/aliases/requests", headers={"Authorization": f"Bearer {token}"})
+    response = client.get("/v2/admin/aliases/requests", headers={"Authorization": f"Bearer {admin_token}"})
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -170,7 +233,12 @@ def test_get_pending_alias_requests_with_jwt(client: TestClient, db_session: Ses
 def test_approve_alias_request_merges_records(client: TestClient, db_session: Session) -> None:
     """Verify POST /v2/admin/aliases/approve/{primary_id}/{alias_id} reassigns workouts, creates audit, and merges member."""
     seed_admin_test_data(db_session)
-    client.post("/v2/aliases/request", json={"primaryMemberId": 1, "aliasMemberId": 2})
+    admin_token = create_access_token(data={"sub": "admin", "role": "admin"})
+    client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
 
     token = create_access_token(data={"sub": "admin"})
     approve_res = client.post(
@@ -204,12 +272,16 @@ def test_approve_alias_request_merges_records(client: TestClient, db_session: Se
 def test_reject_alias_request(client: TestClient, db_session: Session) -> None:
     """Verify POST /v2/admin/aliases/reject/{primary_id}/{alias_id} marks status as rejected."""
     seed_admin_test_data(db_session)
-    client.post("/v2/aliases/request", json={"primaryMemberId": 1, "aliasMemberId": 2})
+    admin_token = create_access_token(data={"sub": "admin", "role": "admin"})
+    client.post(
+        "/v2/aliases/request",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
 
-    token = create_access_token(data={"sub": "admin"})
     reject_res = client.post(
         "/v2/admin/aliases/reject/1/2",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert reject_res.status_code == 200
     assert reject_res.json()["status"] == "rejected"
@@ -250,3 +322,48 @@ def test_jwt_invalid_token_rejected(client: TestClient) -> None:
     response = client.get("/v2/admin/aliases/requests", headers={"Authorization": "Bearer invalid.malformed.token"})
     assert response.status_code == 401
     assert response.json()["errorCode"] == 4010
+
+
+def test_merge_members_resolves_member_slack_conflicts(client: TestClient, db_session: Session) -> None:
+    """Verify when both primary and alias have MEMBER_SLACK records for same team, primary is kept and alias deleted."""
+    seed_admin_test_data(db_session)
+
+    # Primary member 1 has Slack record in T_PROD
+    db_session.add(MemberSlack(member_id=1, slack_team_id="T_PROD", slack_user_id="U_PRIMARY", slack_display_name="Dingo"))
+    # Alias member 2 also has Slack record in T_PROD
+    db_session.add(MemberSlack(member_id=2, slack_team_id="T_PROD", slack_user_id="U_ALIAS", slack_display_name="Wild Dingo"))
+    db_session.commit()
+
+    token = create_access_token(data={"sub": "admin"})
+    merge_res = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert merge_res.status_code == 200
+
+    # Verify primary Slack mapping is retained and alias Slack mapping deleted
+    assert db_session.query(MemberSlack).filter_by(slack_team_id="T_PROD", slack_user_id="U_PRIMARY").first() is not None
+    assert db_session.query(MemberSlack).filter_by(slack_team_id="T_PROD", slack_user_id="U_ALIAS").first() is None
+
+
+def test_merge_members_reassigns_single_member_slack(client: TestClient, db_session: Session) -> None:
+    """Verify when only alias has a MEMBER_SLACK record, it is cleanly reassigned to primary member."""
+    seed_admin_test_data(db_session)
+
+    # Only alias member 2 has Slack record in T_PROD
+    db_session.add(MemberSlack(member_id=2, slack_team_id="T_PROD", slack_user_id="U_ALIAS_ONLY", slack_display_name="Wild Dingo"))
+    db_session.commit()
+
+    token = create_access_token(data={"sub": "admin"})
+    merge_res = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert merge_res.status_code == 200
+
+    # Verify alias Slack mapping reassigned to primary member 1
+    reassigned = db_session.query(MemberSlack).filter_by(slack_team_id="T_PROD", slack_user_id="U_ALIAS_ONLY").first()
+    assert reassigned is not None
+    assert reassigned.member_id == 1
