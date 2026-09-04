@@ -24,6 +24,10 @@ from src.models.workout import Member, MemberAlias, MemberSlack
 from src.utils.logging import timed_service
 from src.utils.security import create_access_token, decode_access_token
 
+# Regular members enjoy a 60-day session lifespan
+MEMBER_SESSION_DURATION = datetime.timedelta(days=60)
+MEMBER_SESSION_EXPIRES_IN = int(MEMBER_SESSION_DURATION.total_seconds())  # 5,184,000 seconds
+
 
 class SlackAuthService:
     """Business logic for Slack OAuth OIDC authentication and F3 member linking."""
@@ -169,13 +173,14 @@ class SlackAuthService:
                     "member_id": member.member_id,
                     "f3_name": member.f3_name,
                     "role": "member",
-                }
+                },
+                expires_delta=MEMBER_SESSION_DURATION,
             )
             return SlackAuthResponse(
                 isLinked=True,
                 accessToken=token,
                 tokenType="bearer",
-                expiresIn=86400,
+                expiresIn=MEMBER_SESSION_EXPIRES_IN,
                 user=AuthUserProfile(
                     memberId=member.member_id,
                     f3Name=member.f3_name,
@@ -270,14 +275,15 @@ class SlackAuthService:
                 "member_id": member.member_id,
                 "f3_name": member.f3_name,
                 "role": "member",
-            }
+            },
+            expires_delta=MEMBER_SESSION_DURATION,
         )
 
         return SlackAuthResponse(
             isLinked=True,
             accessToken=token,
             tokenType="bearer",
-            expiresIn=86400,
+            expiresIn=MEMBER_SESSION_EXPIRES_IN,
             user=AuthUserProfile(
                 memberId=member.member_id,
                 f3Name=member.f3_name,

@@ -110,6 +110,7 @@ def test_slack_login_already_linked_direct_jwt(client: TestClient, db_session: S
         data = res.json()
         assert data["isLinked"] is True
         assert data["accessToken"] is not None
+        assert data["expiresIn"] == 5184000
         assert data["user"]["f3Name"] == "Attila"
         assert data["user"]["memberId"] == member.member_id
 
@@ -189,6 +190,8 @@ def test_confirm_slack_link_success(client: TestClient, db_session: Session) -> 
     assert res.status_code == 200
     data = res.json()
     assert data["isLinked"] is True
+    assert data["accessToken"] is not None
+    assert data["expiresIn"] == 5184000
     assert data["user"]["f3Name"] == "Swag"
     assert data["user"]["memberId"] == member.member_id
 
