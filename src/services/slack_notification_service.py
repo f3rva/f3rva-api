@@ -83,8 +83,8 @@ class SlackNotificationService:
         footer_text = f"Posted by *{escaped_author}*"
 
         fields = [
-            {"type": "mrkdwn", "text": f"*AO:* {ao_str}"},
             {"type": "mrkdwn", "text": f"*Date:* {escaped_date}"},
+            {"type": "mrkdwn", "text": f"*AO:* {ao_str}"},
             {"type": "mrkdwn", "text": f"*QIC:*\n{q_str}"},
             {"type": "mrkdwn", "text": f"*PAX ({pax_count}):*\n{pax_preview}"},
         ]

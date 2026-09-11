@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import calendar
 import datetime
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import text
@@ -326,7 +326,7 @@ class WorkoutService:
 
     @staticmethod
     def _populate_workout_attendees(
-        workout: WorkoutResponse, pax_rows: list[RowMapping | Mapping[Any, Any]]
+        workout: WorkoutResponse, pax_rows: Sequence[RowMapping | Mapping[Any, Any]]
     ) -> None:
         """Categorize attendee rows into PAX, FNGs, and DRs and calculate total pax_count."""
         regular_pax: list[MemberSummary] = []
