@@ -248,10 +248,10 @@ class WorkoutService:
 
         workout = cls._map_row_to_workout(row)
 
-        # Retrieve full PAX attendee roster
+        # Retrieve full attendee roster with PAX_TYPE and IS_DR
         pax_query = text(
             """
-            SELECT m.MEMBER_ID, m.F3_NAME
+            SELECT m.MEMBER_ID, m.F3_NAME, m.IS_DR, wp.PAX_TYPE
             FROM WORKOUT_PAX wp
             INNER JOIN MEMBER m ON wp.MEMBER_ID = m.MEMBER_ID
             WHERE wp.WORKOUT_ID = :workout_id
@@ -259,10 +259,7 @@ class WorkoutService:
             """
         )
         pax_rows = db.execute(pax_query, {"workout_id": workout_id}).mappings().all()
-        workout.pax = [
-            MemberSummary(memberId=p["MEMBER_ID"], f3Name=p["F3_NAME"]) for p in pax_rows
-        ]
-        workout.pax_count = len(workout.pax)
+        cls._populate_workout_attendees(workout, pax_rows)
         workout.content = row.get("HTML_CONTENT")
         return workout
 
@@ -312,10 +309,10 @@ class WorkoutService:
 
         workout = cls._map_row_to_workout(row)
 
-        # Retrieve full PAX attendee roster
+        # Retrieve full attendee roster with PAX_TYPE and IS_DR
         pax_query = text(
             """
-            SELECT m.MEMBER_ID, m.F3_NAME
+            SELECT m.MEMBER_ID, m.F3_NAME, m.IS_DR, wp.PAX_TYPE
             FROM WORKOUT_PAX wp
             INNER JOIN MEMBER m ON wp.MEMBER_ID = m.MEMBER_ID
             WHERE wp.WORKOUT_ID = :workout_id
@@ -323,12 +320,38 @@ class WorkoutService:
             """
         )
         pax_rows = db.execute(pax_query, {"workout_id": workout.workout_id}).mappings().all()
-        workout.pax = [
-            MemberSummary(memberId=p["MEMBER_ID"], f3Name=p["F3_NAME"]) for p in pax_rows
-        ]
-        workout.pax_count = len(workout.pax)
+        cls._populate_workout_attendees(workout, pax_rows)
         workout.content = row.get("HTML_CONTENT")
         return workout
+
+    @staticmethod
+    def _populate_workout_attendees(
+        workout: WorkoutResponse, pax_rows: list[RowMapping | Mapping[Any, Any]]
+    ) -> None:
+        """Categorize attendee rows into PAX, FNGs, and DRs and calculate total pax_count."""
+        regular_pax: list[MemberSummary] = []
+        fng_list: list[MemberSummary] = []
+        dr_list: list[MemberSummary] = []
+
+        for p in pax_rows:
+            is_dr = bool(p.get("IS_DR", False))
+            pax_type = str(p.get("PAX_TYPE") or "PAX").upper()
+            ms = MemberSummary(
+                memberId=p["MEMBER_ID"],
+                f3Name=p["F3_NAME"],
+                isDr=is_dr or (pax_type == "DR"),
+            )
+            if pax_type == "FNG":
+                fng_list.append(ms)
+            elif pax_type == "DR" or is_dr:
+                dr_list.append(ms)
+            else:
+                regular_pax.append(ms)
+
+        workout.pax = regular_pax
+        workout.fngs = fng_list
+        workout.drs = dr_list
+        workout.pax_count = len(regular_pax) + len(fng_list) + len(dr_list)
 
     @staticmethod
     def _map_row_to_workout(row: RowMapping | Mapping[Any, Any]) -> WorkoutResponse:

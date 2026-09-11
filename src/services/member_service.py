@@ -28,13 +28,20 @@ class MemberService:
         """Retrieve an alphabetical list of all registered F3 members."""
         query = text(
             """
-            SELECT MEMBER_ID, F3_NAME
+            SELECT MEMBER_ID, F3_NAME, IS_DR
             FROM MEMBER
             ORDER BY F3_NAME ASC
             """
         )
         rows = db.execute(query).mappings().all()
-        return [MemberSummary(memberId=r["MEMBER_ID"], f3Name=r["F3_NAME"]) for r in rows]
+        return [
+            MemberSummary(
+                memberId=r["MEMBER_ID"],
+                f3Name=r["F3_NAME"],
+                isDr=bool(r.get("IS_DR", False)),
+            )
+            for r in rows
+        ]
 
     @classmethod
     @timed_service
@@ -186,7 +193,7 @@ class MemberService:
         search_param = f"%{clean_query}%"
         query = text(
             """
-            SELECT DISTINCT m.MEMBER_ID, m.F3_NAME
+            SELECT DISTINCT m.MEMBER_ID, m.F3_NAME, m.IS_DR
             FROM MEMBER m
             LEFT OUTER JOIN MEMBER_ALIAS ma ON m.MEMBER_ID = ma.MEMBER_ID
             WHERE UPPER(m.F3_NAME) LIKE UPPER(:search_param)
@@ -195,7 +202,14 @@ class MemberService:
             """
         )
         rows = db.execute(query, {"search_param": search_param}).mappings().all()
-        return [MemberSummary(memberId=r["MEMBER_ID"], f3Name=r["F3_NAME"]) for r in rows]
+        return [
+            MemberSummary(
+                memberId=r["MEMBER_ID"],
+                f3Name=r["F3_NAME"],
+                isDr=bool(r.get("IS_DR", False)),
+            )
+            for r in rows
+        ]
 
     @staticmethod
     def _map_row_to_workout(row: RowMapping | Mapping[Any, Any]) -> WorkoutResponse:

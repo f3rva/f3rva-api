@@ -43,7 +43,7 @@ class WorkoutMutationService:
         cls, db: Session, data: AddWorkoutRequest, current_user: dict[str, Any] | None = None
     ) -> WorkoutCreatedResponse:
         """Add a workout directly with structured payload data."""
-        parsed_date, q_names, pax_names = cls._validate_workout_input(data)
+        parsed_date, q_names, pax_names, fng_names, dr_names = cls._validate_workout_input(data)
 
         # Pre-check for duplicate date and slug to prevent integrity conflicts
         if data.slug:
@@ -91,6 +91,8 @@ class WorkoutMutationService:
                 aos=data.aos,
                 q_names=q_names,
                 pax_names=pax_names,
+                fng_names=fng_names,
+                dr_names=dr_names,
             )
 
             db.commit()
@@ -105,6 +107,8 @@ class WorkoutMutationService:
                 aos=ao_names,
                 q_names=q_names,
                 pax_names=pax_names,
+                fng_names=fng_names,
+                dr_names=dr_names,
             )
 
             return WorkoutCreatedResponse(id=wid, url=resolved_url)
@@ -155,7 +159,7 @@ class WorkoutMutationService:
                     },
                 )
 
-        parsed_date, q_names, pax_names = cls._validate_workout_input(data)
+        parsed_date, q_names, pax_names, fng_names, dr_names = cls._validate_workout_input(data)
 
         settings = get_settings()
         prefix = settings.backblast_url_prefix.rstrip("/") if settings.backblast_url_prefix else None
@@ -185,6 +189,8 @@ class WorkoutMutationService:
             aos=data.aos,
             q_names=q_names,
             pax_names=pax_names,
+            fng_names=fng_names,
+            dr_names=dr_names,
         )
 
         db.commit()
@@ -198,7 +204,7 @@ class WorkoutMutationService:
     @classmethod
     def _validate_workout_input(
         cls, data: AddWorkoutRequest | UpdateWorkoutRequest
-    ) -> tuple[datetime.date, list[str], list[str]]:
+    ) -> tuple[datetime.date, list[str], list[str], list[str], list[str]]:
         """Validate date format, ensure date is not in future, and validate non-empty entities."""
         parsed_date = cls._parse_date_string(data.workout_date)
         if not parsed_date:
@@ -215,13 +221,22 @@ class WorkoutMutationService:
 
         q_names = cls._parse_name_list(data.qic)
         pax_names = cls._parse_name_list(data.pax)
+        raw_fng_names = cls._parse_name_list(data.fngs) if data.fngs else []
+        dr_names = cls._parse_name_list(data.drs) if data.drs else []
+
+        # Clean any accidental (FNG) suffixes
+        fng_names: list[str] = []
+        for name in raw_fng_names:
+            cleaned = re.sub(r"\s*\(\s*fng\s*\)\s*$", "", name, flags=re.IGNORECASE).strip()
+            if cleaned and cleaned not in fng_names:
+                fng_names.append(cleaned)
 
         if not q_names:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"errorCode": 1004, "errorMessage": "At least one Q (leader) is required."},
             )
-        if not pax_names:
+        if not (pax_names or fng_names or dr_names):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"errorCode": 1005, "errorMessage": "At least one PAX attendee is required."},
@@ -232,7 +247,7 @@ class WorkoutMutationService:
                 detail={"errorCode": 1006, "errorMessage": "At least one AO is required."},
             )
 
-        return parsed_date, q_names, pax_names
+        return parsed_date, q_names, pax_names, fng_names, dr_names
 
     @classmethod
     def _save_workout_children(
@@ -243,8 +258,10 @@ class WorkoutMutationService:
         aos: list[AOInput] | list[str] | str,
         q_names: list[str],
         pax_names: list[str],
+        fng_names: list[str] | None = None,
+        dr_names: list[str] | None = None,
     ) -> None:
-        """Persist details, AOs, Qs, and PAX attendees for a given workout ID."""
+        """Persist details, AOs, Qs, and PAX attendees (PAX, FNG, DR) for a given workout ID."""
         # 1. Persist HTML content / details if provided
         if body:
             db.add(WorkoutDetails(workout_id=workout_id, html_content=body))
@@ -270,10 +287,31 @@ class WorkoutMutationService:
             member = cls._get_or_create_member(db=db, name=q_name)
             db.add(WorkoutQ(workout_id=workout_id, member_id=member.member_id))
 
-        # 4. Persist PAX Attendees
+        # 4. Persist Attendees (FNGs, DRs, and regular PAX)
+        saved_member_ids: set[int] = set()
+
+        # 4a. Persist FNG Attendees
+        for fng_name in (fng_names or []):
+            member = cls._get_or_create_member(db=db, name=fng_name, is_dr=False)
+            if member.member_id not in saved_member_ids:
+                saved_member_ids.add(member.member_id)
+                db.add(WorkoutPax(workout_id=workout_id, member_id=member.member_id, pax_type="FNG"))
+
+        # 4b. Persist Downrange (DR) Attendees
+        for dr_name in (dr_names or []):
+            member = cls._get_or_create_member(db=db, name=dr_name, is_dr=True)
+            if member.member_id not in saved_member_ids:
+                saved_member_ids.add(member.member_id)
+                db.add(WorkoutPax(workout_id=workout_id, member_id=member.member_id, pax_type="DR"))
+
+        # 4c. Persist Regular PAX Attendees
         for pax_name in pax_names:
             member = cls._get_or_create_member(db=db, name=pax_name)
-            db.add(WorkoutPax(workout_id=workout_id, member_id=member.member_id))
+            if member.member_id not in saved_member_ids:
+                saved_member_ids.add(member.member_id)
+                # DR people should always be DR
+                pax_type = "DR" if member.is_dr else "PAX"
+                db.add(WorkoutPax(workout_id=workout_id, member_id=member.member_id, pax_type=pax_type))
 
     @classmethod
     @timed_service
@@ -359,7 +397,7 @@ class WorkoutMutationService:
         return ao
 
     @classmethod
-    def _get_or_create_member(cls, db: Session, name: str) -> Member:
+    def _get_or_create_member(cls, db: Session, name: str, is_dr: bool = False) -> Member:
         """Find existing member by primary name or alias; if not found, create a new member."""
         clean_name = name.strip()
         # 1. Check primary member name
@@ -368,6 +406,9 @@ class WorkoutMutationService:
             {"n": clean_name.upper()},
         ).scalar_one_or_none()
         if member:
+            if is_dr and not member.is_dr:
+                member.is_dr = True
+                db.flush()
             return member
 
         # 2. Check alias mapping
@@ -380,10 +421,13 @@ class WorkoutMutationService:
                 select(Member).where(Member.member_id == alias.member_id)
             ).scalar_one_or_none()
             if aliased_member:
+                if is_dr and not aliased_member.is_dr:
+                    aliased_member.is_dr = True
+                    db.flush()
                 return aliased_member
 
         # 3. Create new member
-        new_member = Member(f3_name=clean_name)
+        new_member = Member(f3_name=clean_name, is_dr=is_dr)
         db.add(new_member)
         db.flush()
         return new_member
