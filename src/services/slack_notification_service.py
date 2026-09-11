@@ -48,6 +48,8 @@ class SlackNotificationService:
         aos: list[str],
         q_names: list[str],
         pax_names: list[str],
+        fng_names: list[str] | None = None,
+        dr_names: list[str] | None = None,
     ) -> bool:
         """Post a structured Block Kit message summarizing a published workout backblast."""
         settings = get_settings()
@@ -62,6 +64,8 @@ class SlackNotificationService:
         escaped_aos = [_escape_mrkdwn(ao) for ao in aos]
         escaped_qs = [_escape_mrkdwn(q) for q in q_names]
         escaped_pax = [_escape_mrkdwn(p) for p in pax_names]
+        escaped_fngs = [_escape_mrkdwn(f) for f in (fng_names or [])]
+        escaped_drs = [_escape_mrkdwn(d) for d in (dr_names or [])]
 
         # Format location and attendees
         ao_str = ", ".join(escaped_aos) if escaped_aos else "Unspecified AO"
@@ -78,6 +82,19 @@ class SlackNotificationService:
         header_text = f"<{post_link}|*{escaped_title}*>" if post_link else f"*{escaped_title}*"
         footer_text = f"Posted by *{escaped_author}*"
 
+        fields = [
+            {"type": "mrkdwn", "text": f"*AO:* {ao_str}"},
+            {"type": "mrkdwn", "text": f"*Date:* {escaped_date}"},
+            {"type": "mrkdwn", "text": f"*QIC:*\n{q_str}"},
+            {"type": "mrkdwn", "text": f"*PAX ({pax_count}):*\n{pax_preview}"},
+        ]
+        if escaped_fngs:
+            fng_str = ", ".join(escaped_fngs)
+            fields.append({"type": "mrkdwn", "text": f"*FNGs ({len(escaped_fngs)}):*\n{fng_str}"})
+        if escaped_drs:
+            dr_str = ", ".join(escaped_drs)
+            fields.append({"type": "mrkdwn", "text": f"*Downrange ({len(escaped_drs)}):*\n{dr_str}"})
+
         blocks: list[dict[str, Any]] = [
             {
                 "type": "section",
@@ -88,12 +105,7 @@ class SlackNotificationService:
             },
             {
                 "type": "section",
-                "fields": [
-                    {"type": "mrkdwn", "text": f"*Date:* {escaped_date}"},
-                    {"type": "mrkdwn", "text": f"*AO:* {ao_str}"},
-                    {"type": "mrkdwn", "text": f"*QIC:*\n{q_str}"},
-                    {"type": "mrkdwn", "text": f"*PAX ({pax_count}):*\n{pax_preview}"},
-                ],
+                "fields": fields,
             },
             {
                 "type": "context",

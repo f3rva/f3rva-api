@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.config.database import Base
@@ -29,6 +29,7 @@ class Member(Base):
         "MEMBER_ID", Integer, primary_key=True, autoincrement=True
     )
     f3_name: Mapped[str] = mapped_column("F3_NAME", String(255), nullable=False)
+    is_dr: Mapped[bool] = mapped_column("IS_DR", Boolean, default=False, nullable=False)
 
 
 class MemberAlias(Base):
@@ -138,6 +139,7 @@ class WorkoutPax(Base):
     member_id: Mapped[int] = mapped_column(
         "MEMBER_ID", Integer, ForeignKey("MEMBER.MEMBER_ID"), primary_key=True
     )
+    pax_type: Mapped[str] = mapped_column("PAX_TYPE", String(16), default="PAX", nullable=False)
 
 
 class WorkoutDetails(Base):

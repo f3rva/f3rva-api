@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from src.models.workout import AO, Workout, WorkoutAO, WorkoutDetails, WorkoutPax, WorkoutQ
+from src.models.workout import AO, Member, Workout, WorkoutAO, WorkoutDetails, WorkoutPax, WorkoutQ
 from src.utils.security import create_access_token
 
 
@@ -453,4 +453,199 @@ def test_add_workout_auto_generates_url_from_settings_prefix(
         w = db_session.query(Workout).filter(Workout.workout_id == wid).first()
         assert w is not None
         assert w.backblast_url == "https://custom.f3rva.org/2026/08/09/custom-domain-test"
+
+
+def test_add_workout_with_fngs_and_drs(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str]
+) -> None:
+    """Verify adding a workout with separate PAX, FNGs, and DRs."""
+    payload = {
+        "title": "FNG and DR Welcome Beatdown",
+        "workoutDate": "2026-08-10",
+        "qic": ["Dingo"],
+        "pax": ["Lab Rat"],
+        "fngs": ["Sparky (FNG)"],
+        "drs": ["Outlaw"],
+        "aos": [{"name": "First Watch"}],
+        "slug": "fng-and-dr-welcome-beatdown",
+    }
+    res = client.post("/v2/workouts", json=payload, headers=auth_headers)
+    assert res.status_code == 201
+    wid = res.json()["id"]
+
+    # Verify Sparky was cleaned and registered as non-DR
+    sparky = db_session.query(Member).filter(Member.f3_name == "Sparky").first()
+    assert sparky is not None
+    assert sparky.is_dr is False
+
+    # Verify Outlaw was registered with is_dr = True
+    outlaw = db_session.query(Member).filter(Member.f3_name == "Outlaw").first()
+    assert outlaw is not None
+    assert outlaw.is_dr is True
+
+    # Verify WorkoutPax records
+    sparky_pax = db_session.query(WorkoutPax).filter(
+        WorkoutPax.workout_id == wid, WorkoutPax.member_id == sparky.member_id
+    ).first()
+    assert sparky_pax is not None
+    assert sparky_pax.pax_type == "FNG"
+
+    outlaw_pax = db_session.query(WorkoutPax).filter(
+        WorkoutPax.workout_id == wid, WorkoutPax.member_id == outlaw.member_id
+    ).first()
+    assert outlaw_pax is not None
+    assert outlaw_pax.pax_type == "DR"
+
+    # Verify GET /v2/workouts/{id} reflects categorized attendees
+    get_res = client.get(f"/v2/workouts/{wid}")
+    assert get_res.status_code == 200
+    data = get_res.json()
+    assert data["paxCount"] == 3
+    assert len(data["pax"]) == 1
+    assert data["pax"][0]["f3Name"] == "Lab Rat"
+    assert len(data["fngs"]) == 1
+    assert data["fngs"][0]["f3Name"] == "Sparky"
+    assert len(data["drs"]) == 1
+    assert data["drs"][0]["f3Name"] == "Outlaw"
+
+
+def test_former_fng_is_regular_pax_in_subsequent_workout(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str]
+) -> None:
+    """Verify that an FNG from a prior workout is recorded as regular PAX in subsequent workouts."""
+    # Workout 1: Rookie is FNG
+    res1 = client.post(
+        "/v2/workouts",
+        json={
+            "title": "First Workout",
+            "workoutDate": "2026-08-01",
+            "qic": ["Dingo"],
+            "pax": ["Dingo"],
+            "fngs": ["Rookie"],
+            "aos": [{"name": "First Watch"}],
+            "slug": "first-workout",
+        },
+        headers=auth_headers,
+    )
+    assert res1.status_code == 201
+
+    rookie = db_session.query(Member).filter(Member.f3_name == "Rookie").first()
+    assert rookie is not None
+    assert rookie.is_dr is False
+
+    # Workout 2: Rookie is regular PAX
+    res2 = client.post(
+        "/v2/workouts",
+        json={
+            "title": "Second Workout",
+            "workoutDate": "2026-08-02",
+            "qic": ["Dingo"],
+            "pax": ["Rookie", "Dingo"],
+            "aos": [{"name": "First Watch"}],
+            "slug": "second-workout",
+        },
+        headers=auth_headers,
+    )
+    assert res2.status_code == 201
+    wid2 = res2.json()["id"]
+
+    rookie_pax_2 = db_session.query(WorkoutPax).filter(
+        WorkoutPax.workout_id == wid2, WorkoutPax.member_id == rookie.member_id
+    ).first()
+    assert rookie_pax_2 is not None
+    assert rookie_pax_2.pax_type == "PAX"
+
+
+def test_dr_member_always_remains_dr(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str]
+) -> None:
+    """Verify that a member flagged as DR always remains DR even if submitted in the regular pax field."""
+    # Workout 1: Visitor is DR
+    res1 = client.post(
+        "/v2/workouts",
+        json={
+            "title": "Visitor Workout",
+            "workoutDate": "2026-08-03",
+            "qic": ["Dingo"],
+            "drs": ["VisitorBob"],
+            "aos": [{"name": "First Watch"}],
+            "slug": "visitor-workout",
+        },
+        headers=auth_headers,
+    )
+    assert res1.status_code == 201
+
+    visitor = db_session.query(Member).filter(Member.f3_name == "VisitorBob").first()
+    assert visitor is not None
+    assert visitor.is_dr is True
+
+    # Workout 2: Author mistakenly puts VisitorBob in regular pax list
+    res2 = client.post(
+        "/v2/workouts",
+        json={
+            "title": "Subsequent Workout",
+            "workoutDate": "2026-08-04",
+            "qic": ["Dingo"],
+            "pax": ["VisitorBob"],
+            "aos": [{"name": "First Watch"}],
+            "slug": "subsequent-workout",
+        },
+        headers=auth_headers,
+    )
+    assert res2.status_code == 201
+    wid2 = res2.json()["id"]
+
+    visitor_pax_2 = db_session.query(WorkoutPax).filter(
+        WorkoutPax.workout_id == wid2, WorkoutPax.member_id == visitor.member_id
+    ).first()
+    assert visitor_pax_2 is not None
+    assert visitor_pax_2.pax_type == "DR"
+
+
+def test_update_workout_with_fngs_and_drs(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str]
+) -> None:
+    """Verify updating a workout correctly replaces and categorizes PAX, FNGs, and DRs."""
+    res1 = client.post(
+        "/v2/workouts",
+        json={
+            "title": "Original Workout",
+            "workoutDate": "2026-08-05",
+            "qic": ["Dingo"],
+            "pax": ["Lab Rat"],
+            "aos": [{"name": "First Watch"}],
+            "slug": "original-workout",
+        },
+        headers=auth_headers,
+    )
+    assert res1.status_code == 201
+    wid = res1.json()["id"]
+
+    # Update to add FNG and DR
+    update_res = client.put(
+        f"/v2/workouts/{wid}",
+        json={
+            "title": "Updated Workout",
+            "workoutDate": "2026-08-05",
+            "qic": ["Dingo"],
+            "pax": ["Lab Rat"],
+            "fngs": ["NewGuy"],
+            "drs": ["SeattleGuy"],
+            "aos": [{"name": "First Watch"}],
+            "slug": "original-workout",
+        },
+        headers=auth_headers,
+    )
+    assert update_res.status_code == 200
+
+    get_res = client.get(f"/v2/workouts/{wid}")
+    assert get_res.status_code == 200
+    data = get_res.json()
+    assert data["paxCount"] == 3
+    assert len(data["pax"]) == 1
+    assert len(data["fngs"]) == 1
+    assert data["fngs"][0]["f3Name"] == "NewGuy"
+    assert len(data["drs"]) == 1
+    assert data["drs"][0]["f3Name"] == "SeattleGuy"
+
 

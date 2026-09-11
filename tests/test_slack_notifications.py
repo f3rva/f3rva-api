@@ -225,3 +225,72 @@ def test_slack_notification_http_error_handled_gracefully() -> None:
             pax_names=["Dingo"],
         )
         assert res is False
+
+
+def test_slack_notification_with_fngs_and_drs() -> None:
+    """Verify Slack notification conditionally includes FNGs and Downrange PAX when present."""
+    import json
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b'{"ok": true}'
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("src.services.slack_notification_service.get_settings") as mock_settings, \
+         patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        mock_settings.return_value.slack_bot_token = "xoxb-test-token"
+        mock_settings.return_value.slack_backblast_channel_id = "C12345"
+
+        res = SlackNotificationService.post_backblast_summary(
+            title="Beatdown with FNG and DR",
+            workout_date="2026-08-11",
+            url="https://f3rva.org/beatdown",
+            author="Dingo",
+            aos=["First Watch"],
+            q_names=["Dingo"],
+            pax_names=["Lab Rat"],
+            fng_names=["Sparky"],
+            dr_names=["Outlaw (F3 Raleigh)"],
+        )
+        assert res is True
+        req = mock_urlopen.call_args[0][0]
+        payload = json.loads(req.data.decode("utf-8"))
+        fields = payload["blocks"][1]["fields"]
+        field_texts = [f["text"] for f in fields]
+
+        assert any("*FNGs (1):*" in t and "Sparky" in t for t in field_texts)
+        assert any("*Downrange (1):*" in t and "Outlaw" in t for t in field_texts)
+
+
+def test_slack_notification_without_fngs_and_drs_omits_fields() -> None:
+    """Verify Slack notification keeps message short and omits FNG and Downrange when empty."""
+    import json
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b'{"ok": true}'
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("src.services.slack_notification_service.get_settings") as mock_settings, \
+         patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        mock_settings.return_value.slack_bot_token = "xoxb-test-token"
+        mock_settings.return_value.slack_backblast_channel_id = "C12345"
+
+        res = SlackNotificationService.post_backblast_summary(
+            title="Regular Beatdown",
+            workout_date="2026-08-11",
+            url="https://f3rva.org/beatdown",
+            author="Dingo",
+            aos=["First Watch"],
+            q_names=["Dingo"],
+            pax_names=["Lab Rat"],
+            fng_names=[],
+            dr_names=None,
+        )
+        assert res is True
+        req = mock_urlopen.call_args[0][0]
+        payload = json.loads(req.data.decode("utf-8"))
+        fields = payload["blocks"][1]["fields"]
+        field_texts = [f["text"] for f in fields]
+
+        assert not any("*FNGs" in t for t in field_texts)
+        assert not any("*Downrange" in t for t in field_texts)
+

@@ -22,6 +22,7 @@ class MemberSummary(BaseModel):
 
     member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="Unique Member ID")
     f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="F3 Name / Nickname")
+    is_dr: bool = Field(default=False, alias="isDr", serialization_alias="isDr", description="Indicates if member is Downrange")
 
 
 class WorkoutResponse(BaseModel):
@@ -38,7 +39,9 @@ class WorkoutResponse(BaseModel):
     pax_count: int = Field(default=0, alias="paxCount", serialization_alias="paxCount", description="Total number of attendees")
     ao: list[AOSummary] = Field(default_factory=list, description="Associated AOs")
     q: list[MemberSummary] = Field(default_factory=list, description="Workout leaders / Qs")
-    pax: list[MemberSummary] | None = Field(default=None, description="Full attendee list (only on detail views)")
+    pax: list[MemberSummary] | None = Field(default=None, description="Regular PAX attendee list (only on detail views)")
+    fngs: list[MemberSummary] = Field(default_factory=list, description="FNG attendee list (only on detail views)")
+    drs: list[MemberSummary] = Field(default_factory=list, description="Downrange attendee list (only on detail views)")
     content: str | None = Field(default=None, description="Raw HTML backblast body content")
 
 
@@ -191,7 +194,9 @@ class AddWorkoutRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Workout title")
     workout_date: str = Field(..., alias="workoutDate", description="Date of workout (YYYY-MM-DD)")
     qic: list[str] | str = Field(..., description="List or comma-separated string of Qs")
-    pax: list[str] | str = Field(..., description="List or comma-separated string of attendees")
+    pax: list[str] | str = Field(default_factory=list, description="List or comma-separated string of regular PAX attendees")
+    fngs: list[str] | str | None = Field(default=None, description="List or comma-separated string of FNGs")
+    drs: list[str] | str | None = Field(default=None, description="List or comma-separated string of Downrange (DR) attendees")
     aos: list[AOInput] | list[str] | str = Field(..., description="List of AOInput objects, list of AO names, or comma-separated string")
     body: str | None = Field(default=None, description="HTML or text content of the backblast")
     url: str | None = Field(default=None, description="Direct URL to original backblast post")
