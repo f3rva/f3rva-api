@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import urllib.parse
 import urllib.request
@@ -13,6 +14,8 @@ from fastapi import HTTPException, status
 from src.config.settings import get_settings
 from src.models.schemas import WorkoutScheduleItem, WorkoutScheduleResponse
 from src.utils.logging import timed_service
+
+logger = logging.getLogger(__name__)
 
 
 def slugify(text: str) -> str:
@@ -112,7 +115,8 @@ class ScheduleService:
         except HTTPException:
             raise
         except Exception as err:
+            logger.error("Failed to fetch schedule from F3 Nation API: %s", err, exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={"errorCode": 5002, "errorMessage": f"Failed to fetch schedule from F3 Nation API: {err}"},
+                detail={"errorCode": 5002, "errorMessage": "Failed to fetch schedule from upstream F3 Nation API."},
             ) from err

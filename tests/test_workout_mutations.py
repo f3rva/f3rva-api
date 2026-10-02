@@ -259,6 +259,13 @@ def test_delete_workout_unauthorized_without_token(client: TestClient) -> None:
     assert res.json()["errorCode"] == 4010
 
 
+def test_delete_workout_forbidden_for_non_admin_member(client: TestClient, auth_headers: dict[str, str]) -> None:
+    """Verify DELETE /v2/workouts/{id} returns 403 when called with non-admin member token."""
+    res = client.delete("/v2/workouts/101", headers=auth_headers)
+    assert res.status_code == 403
+    assert res.json()["errorCode"] == 4003
+
+
 def test_delete_workout_not_found_404(client: TestClient, admin_headers: dict[str, str]) -> None:
     """Verify DELETE /v2/workouts/99999 returns 404 for non-existent workout."""
     res = client.delete("/v2/workouts/99999", headers=admin_headers)

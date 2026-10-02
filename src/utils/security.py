@@ -17,7 +17,12 @@ security_bearer = HTTPBearer(auto_error=False)
 def create_access_token(data: dict[str, Any], expires_delta: datetime.timedelta | None = None) -> str:
     """Generate a signed HS256 JWT bearer token."""
     settings = get_settings()
-    jwt_secret = settings.jwt_secret_key or "jwt-secret-key-fallback"
+    jwt_secret = settings.jwt_secret_key
+    if not jwt_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"errorCode": 5000, "errorMessage": "JWT secret key is not configured."},
+        )
     to_encode = data.copy()
     expire = datetime.datetime.now(datetime.UTC) + (
         expires_delta or datetime.timedelta(hours=24)
@@ -29,7 +34,12 @@ def create_access_token(data: dict[str, Any], expires_delta: datetime.timedelta 
 def decode_access_token(token: str) -> dict[str, Any]:
     """Decode and validate a signed JWT bearer token."""
     settings = get_settings()
-    jwt_secret = settings.jwt_secret_key or "jwt-secret-key-fallback"
+    jwt_secret = settings.jwt_secret_key
+    if not jwt_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"errorCode": 5000, "errorMessage": "JWT secret key is not configured."},
+        )
     try:
         payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
         return payload
@@ -71,9 +81,10 @@ def get_current_admin(
     payload = get_current_user(credentials)
     username = payload.get("sub")
     role = payload.get("role")
-    if role != "admin" and not username:
+    if role != "admin" or not username:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"errorCode": 4003, "errorMessage": "Admin role required."},
         )
     return str(username)
+

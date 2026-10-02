@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
 from src.config.database import get_db
-from src.main import app, handler
+from src.config.settings import Settings
+from src.main import app, get_allowed_origins, handler
 
 
 def test_health_check_success(client: TestClient) -> None:
@@ -92,7 +93,7 @@ def test_swagger_docs_available(client: TestClient) -> None:
 
 
 def test_cors_headers_present(client: TestClient) -> None:
-    """Verify that CORS preflight and access-control headers are returned."""
+    """Verify that CORS preflight and access-control headers are returned for approved production origins."""
     headers = {
         "Origin": "https://f3rva.org",
         "Access-Control-Request-Method": "GET",
@@ -101,6 +102,52 @@ def test_cors_headers_present(client: TestClient) -> None:
     response = client.options("/health", headers=headers)
     assert response.status_code == 200
     assert response.headers.get("access-control-allow-origin") == "https://f3rva.org"
+    assert response.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_cors_local_dev_origin_allowed(client: TestClient) -> None:
+    """Verify that CORS preflight allows local development origins with credentials."""
+    headers = {
+        "Origin": "http://localhost:3000",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "Content-Type",
+    }
+    response = client.options("/health", headers=headers)
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    assert response.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_cors_untrusted_origin_rejected(client: TestClient) -> None:
+    """Verify that CORS preflight from an untrusted origin does NOT return allow-origin header."""
+    headers = {
+        "Origin": "https://malicious-third-party.com",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "Content-Type",
+    }
+    response = client.options("/health", headers=headers)
+    assert response.headers.get("access-control-allow-origin") is None
+
+
+def test_get_allowed_origins_custom_settings() -> None:
+    """Verify that get_allowed_origins includes base domains and dynamically appends custom origins."""
+    custom_settings = Settings(cors_allowed_origins="https://preview.f3rva.org, https://custom.org, http://localhost:3000")
+    origins = get_allowed_origins(custom_settings)
+    assert "https://f3rva.org" in origins
+    assert "https://preview.f3rva.org" in origins
+    assert "https://custom.org" in origins
+    # Ensure no duplicates when an existing origin is specified
+    assert origins.count("http://localhost:3000") == 1
+
+
+def test_security_headers_present_on_responses(client: TestClient) -> None:
+    """Verify that OWASP defensive security headers are returned on all responses."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers.get("x-content-type-options") == "nosniff"
+    assert response.headers.get("x-frame-options") == "DENY"
+    assert response.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+    assert response.headers.get("strict-transport-security") == "max-age=31536000; includeSubDomains"
 
 
 def test_global_exception_handler() -> None:

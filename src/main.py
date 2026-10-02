@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
@@ -14,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
-from src.config.settings import get_settings
+from src.config.settings import Settings, get_settings
 from src.config.version import get_version
 from src.routers import admin, aliases, auth, members, reports, schedule, workouts
 
@@ -42,25 +43,63 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Configure Cross-Origin Resource Sharing (CORS)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8000",
+def get_allowed_origins(app_settings: Settings) -> list[str]:
+    """Compile list of trusted CORS origins for browser preflight validation."""
+    origins = [
+        # Production
         "https://f3rva.org",
         "https://www.f3rva.org",
+        "https://api.f3rva.org",
+        "https://f3rva.com",
+        "https://www.f3rva.com",
+        "https://f3rva.net",
+        "https://www.f3rva.net",
+        # Development / Staging
         "https://dev.f3rva.org",
         "https://www.dev.f3rva.org",
-        "https://api.f3rva.org",
         "https://api.dev.f3rva.org",
-        "*",  # Open for public read APIs
-    ],
+        # Local Development
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://localhost:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:4173",
+        "http://127.0.0.1:8000",
+    ]
+    if app_settings.cors_allowed_origins:
+        for extra in app_settings.cors_allowed_origins.split(","):
+            extra_cleaned = extra.strip()
+            if extra_cleaned and extra_cleaned not in origins:
+                origins.append(extra_cleaned)
+    return origins
+
+
+# Configure Cross-Origin Resource Sharing (CORS)
+allowed_origins = get_allowed_origins(settings)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Inject OWASP defensive security response headers on all outgoing HTTP responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 
 # Mount Domain Routers
 app.include_router(schedule.router, prefix="/schedule", tags=["Schedule"])

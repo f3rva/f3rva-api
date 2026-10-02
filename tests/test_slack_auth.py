@@ -230,6 +230,75 @@ def test_confirm_slack_link_member_not_found(client: TestClient) -> None:
     assert res.json()["errorCode"] == 2001
 
 
+def test_confirm_slack_link_already_claimed_by_another_user_409(client: TestClient, db_session: Session) -> None:
+    """Verify POST /v2/auth/slack/confirm-link returns 409 when target member is already linked to another Slack user."""
+    member = Member(f3_name="ExistingLinkedMember")
+    db_session.add(member)
+    db_session.flush()
+
+    # User A is already linked to this member
+    db_session.add(
+        MemberSlack(
+            member_id=member.member_id,
+            slack_team_id="T_PROD",
+            slack_user_id="U_USER_A",
+            slack_display_name="UserA",
+        )
+    )
+    db_session.commit()
+
+    # User B tries to link to the same member
+    temp_token_b = create_access_token(
+        data={
+            "sub": "U_USER_B",
+            "team_id": "T_PROD",
+            "type": "slack_temp_link",
+        }
+    )
+    res = client.post(
+        "/v2/auth/slack/confirm-link",
+        json={"tempToken": temp_token_b, "memberId": member.member_id},
+    )
+    assert res.status_code == 409
+    assert res.json()["errorCode"] == 2004
+    assert "already linked to another Slack account" in res.json()["errorMessage"]
+
+
+def test_confirm_slack_link_user_already_linked_different_member_409(client: TestClient, db_session: Session) -> None:
+    """Verify POST /v2/auth/slack/confirm-link returns 409 when the Slack user is already linked to a different member."""
+    m1 = Member(f3_name="FirstMember")
+    m2 = Member(f3_name="SecondMember")
+    db_session.add_all([m1, m2])
+    db_session.flush()
+
+    # User is already linked to m1
+    db_session.add(
+        MemberSlack(
+            member_id=m1.member_id,
+            slack_team_id="T_PROD",
+            slack_user_id="U_SWITCH_ATTEMPT",
+            slack_display_name="User",
+        )
+    )
+    db_session.commit()
+
+    # User tries to link to m2
+    temp_token = create_access_token(
+        data={
+            "sub": "U_SWITCH_ATTEMPT",
+            "team_id": "T_PROD",
+            "type": "slack_temp_link",
+        }
+    )
+    res = client.post(
+        "/v2/auth/slack/confirm-link",
+        json={"tempToken": temp_token, "memberId": m2.member_id},
+    )
+    assert res.status_code == 409
+    assert res.json()["errorCode"] == 2004
+    assert "already linked to a different member profile" in res.json()["errorMessage"]
+
+
 def test_get_current_user_profile_member_success(client: TestClient, db_session: Session) -> None:
     """Verify GET /v2/auth/me returns active member profile."""
     member = Member(f3_name="Splinter")

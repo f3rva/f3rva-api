@@ -240,7 +240,7 @@ def test_approve_alias_request_merges_records(client: TestClient, db_session: Se
         headers={"Authorization": f"Bearer {admin_token}"},
     )
 
-    token = create_access_token(data={"sub": "admin"})
+    token = create_access_token(data={"sub": "admin", "role": "admin"})
     approve_res = client.post(
         "/v2/admin/aliases/approve/1/2",
         headers={"Authorization": f"Bearer {token}"},
@@ -291,7 +291,7 @@ def test_direct_merge_members(client: TestClient, db_session: Session) -> None:
     """Verify POST /v2/admin/members/merge merges members directly without requiring prior request."""
     seed_admin_test_data(db_session)
 
-    token = create_access_token(data={"sub": "admin"})
+    token = create_access_token(data={"sub": "admin", "role": "admin"})
     merge_res = client.post(
         "/v2/admin/members/merge",
         json={"primaryMemberId": 1, "aliasMemberId": 2},
@@ -334,7 +334,7 @@ def test_merge_members_resolves_member_slack_conflicts(client: TestClient, db_se
     db_session.add(MemberSlack(member_id=2, slack_team_id="T_PROD", slack_user_id="U_ALIAS", slack_display_name="Wild Dingo"))
     db_session.commit()
 
-    token = create_access_token(data={"sub": "admin"})
+    token = create_access_token(data={"sub": "admin", "role": "admin"})
     merge_res = client.post(
         "/v2/admin/members/merge",
         json={"primaryMemberId": 1, "aliasMemberId": 2},
@@ -355,7 +355,7 @@ def test_merge_members_reassigns_single_member_slack(client: TestClient, db_sess
     db_session.add(MemberSlack(member_id=2, slack_team_id="T_PROD", slack_user_id="U_ALIAS_ONLY", slack_display_name="Wild Dingo"))
     db_session.commit()
 
-    token = create_access_token(data={"sub": "admin"})
+    token = create_access_token(data={"sub": "admin", "role": "admin"})
     merge_res = client.post(
         "/v2/admin/members/merge",
         json={"primaryMemberId": 1, "aliasMemberId": 2},
@@ -367,3 +367,57 @@ def test_merge_members_reassigns_single_member_slack(client: TestClient, db_sess
     reassigned = db_session.query(MemberSlack).filter_by(slack_team_id="T_PROD", slack_user_id="U_ALIAS_ONLY").first()
     assert reassigned is not None
     assert reassigned.member_id == 1
+
+
+def test_admin_endpoint_forbidden_for_non_admin_member(client: TestClient, db_session: Session) -> None:
+    """Verify GET /v2/admin/aliases/requests rejects authenticated non-admin member token with 403."""
+    seed_admin_test_data(db_session)
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
+
+    response = client.get(
+        "/v2/admin/aliases/requests",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["errorCode"] == 4003
+
+
+def test_admin_endpoint_forbidden_for_token_without_role(client: TestClient, db_session: Session) -> None:
+    """Verify GET /v2/admin/aliases/requests rejects token missing admin role with 403."""
+    seed_admin_test_data(db_session)
+    token_without_role = create_access_token(data={"sub": "user_without_role"})
+
+    response = client.get(
+        "/v2/admin/aliases/requests",
+        headers={"Authorization": f"Bearer {token_without_role}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["errorCode"] == 4003
+
+
+def test_admin_approve_alias_forbidden_for_non_admin_member(client: TestClient, db_session: Session) -> None:
+    """Verify POST /v2/admin/aliases/approve/{primary_id}/{alias_id} rejects non-admin token with 403."""
+    seed_admin_test_data(db_session)
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
+
+    response = client.post(
+        "/v2/admin/aliases/approve/1/2",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["errorCode"] == 4003
+
+
+def test_admin_direct_merge_forbidden_for_non_admin_member(client: TestClient, db_session: Session) -> None:
+    """Verify POST /v2/admin/members/merge rejects non-admin member token with 403."""
+    seed_admin_test_data(db_session)
+    member_token = create_access_token(data={"sub": "slack:U1", "member_id": 1, "role": "member"})
+
+    response = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["errorCode"] == 4003
+

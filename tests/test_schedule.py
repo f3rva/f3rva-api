@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import urllib.request
 
 import pytest
@@ -127,8 +128,10 @@ def test_get_workout_schedule_missing_api_key(client: TestClient, monkeypatch: p
     assert data["errorCode"] == 5001
 
 
-def test_get_workout_schedule_upstream_failure(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify GET /schedule returns 502 when upstream call throws an error."""
+def test_get_workout_schedule_upstream_failure(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Verify GET /schedule returns 502 with sanitized error message and logs raw exception internally."""
     settings = get_settings()
     monkeypatch.setattr(settings, "f3_nation_api_key", "test-api-key")
 
@@ -137,7 +140,12 @@ def test_get_workout_schedule_upstream_failure(client: TestClient, monkeypatch: 
 
     monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen_error)
 
-    response = client.get("/schedule")
+    with caplog.at_level(logging.ERROR):
+        response = client.get("/schedule")
+
     assert response.status_code == 502
     data = response.json()
     assert data["errorCode"] == 5002
+    assert data["errorMessage"] == "Failed to fetch schedule from upstream F3 Nation API."
+    assert "Upstream timeout" not in data["errorMessage"]
+    assert "Failed to fetch schedule from F3 Nation API: <urlopen error Upstream timeout>" in caplog.text
