@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.config.database import get_db
-from src.config.settings import get_settings
+from src.config.settings import Settings, get_settings
 from src.config.version import get_version
 from src.routers import admin, aliases, auth, members, reports, schedule, workouts
 
@@ -42,21 +42,45 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Configure Cross-Origin Resource Sharing (CORS)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8000",
+def get_allowed_origins(app_settings: Settings) -> list[str]:
+    """Compile list of trusted CORS origins for browser preflight validation."""
+    origins = [
+        # Production
         "https://f3rva.org",
         "https://www.f3rva.org",
+        "https://api.f3rva.org",
+        "https://f3rva.com",
+        "https://www.f3rva.com",
+        "https://f3rva.net",
+        "https://www.f3rva.net",
+        # Development / Staging
         "https://dev.f3rva.org",
         "https://www.dev.f3rva.org",
-        "https://api.f3rva.org",
         "https://api.dev.f3rva.org",
-        "*",  # Open for public read APIs
-    ],
+        # Local Development
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://localhost:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:4173",
+        "http://127.0.0.1:8000",
+    ]
+    if app_settings.cors_allowed_origins:
+        for extra in app_settings.cors_allowed_origins.split(","):
+            extra_cleaned = extra.strip()
+            if extra_cleaned and extra_cleaned not in origins:
+                origins.append(extra_cleaned)
+    return origins
+
+
+# Configure Cross-Origin Resource Sharing (CORS)
+allowed_origins = get_allowed_origins(settings)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

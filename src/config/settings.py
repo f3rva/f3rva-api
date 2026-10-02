@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     # Backblast Configuration
     backblast_url_prefix: str | None = Field(default=None, description="Public site base URL prefix for constructing backblast permalinks")
 
+    # CORS Configuration
+    cors_allowed_origins: str | None = Field(default=None, description="Optional comma-separated list of additional allowed CORS origins")
+
 
 @lru_cache
 def get_settings() -> Settings:
