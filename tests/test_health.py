@@ -140,6 +140,16 @@ def test_get_allowed_origins_custom_settings() -> None:
     assert origins.count("http://localhost:3000") == 1
 
 
+def test_security_headers_present_on_responses(client: TestClient) -> None:
+    """Verify that OWASP defensive security headers are returned on all responses."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers.get("x-content-type-options") == "nosniff"
+    assert response.headers.get("x-frame-options") == "DENY"
+    assert response.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+    assert response.headers.get("strict-transport-security") == "max-age=31536000; includeSubDomains"
+
+
 def test_global_exception_handler() -> None:
     """Verify that unhandled exceptions are caught and converted into structured 500 JSON."""
 
