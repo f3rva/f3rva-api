@@ -71,9 +71,10 @@ def get_current_admin(
     payload = get_current_user(credentials)
     username = payload.get("sub")
     role = payload.get("role")
-    if role != "admin" and not username:
+    if role != "admin" or not username:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"errorCode": 4003, "errorMessage": "Admin role required."},
         )
     return str(username)
+
