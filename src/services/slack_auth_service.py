@@ -240,6 +240,23 @@ class SlackAuthService:
                 detail={"errorCode": 2001, "errorMessage": f"Member ID {member_id} not found."},
             )
 
+        # Ensure target member ID is not already linked to another Slack user in this workspace
+        already_claimed = db.execute(
+            select(MemberSlack).where(
+                MemberSlack.slack_team_id == slack_team_id,
+                MemberSlack.member_id == member_id,
+                MemberSlack.slack_user_id != slack_user_id,
+            )
+        ).scalar_one_or_none()
+        if already_claimed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "errorCode": 2004,
+                    "errorMessage": f"Member ID {member_id} is already linked to another Slack account in this workspace.",
+                },
+            )
+
         # Check existing mapping or insert new
         existing = db.execute(
             select(MemberSlack).where(
@@ -249,7 +266,14 @@ class SlackAuthService:
         ).scalar_one_or_none()
 
         if existing:
-            existing.member_id = member_id
+            if existing.member_id != member_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "errorCode": 2004,
+                        "errorMessage": "Your Slack account is already linked to a different member profile.",
+                    },
+                )
             existing.slack_display_name = payload.get("display_name")
             existing.slack_real_name = payload.get("real_name")
             existing.slack_email = payload.get("email")
