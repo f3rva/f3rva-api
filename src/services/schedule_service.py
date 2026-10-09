@@ -44,7 +44,9 @@ def transform_events_to_workouts(events: list[dict[str, Any]]) -> list[WorkoutSc
         if not address_str:
             address_str = location_name
 
-        location_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(address_str)}"
+        location_url = (
+            f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(address_str)}"
+        )
         tag_url = f"/archives/ao/{slugify(name)}/"
         day_of_week = (event.get("dayOfWeek") or "").capitalize()
 
@@ -92,31 +94,46 @@ class ScheduleService:
 
         region_id = settings.f3_region_id or "25240"
         client_id = settings.client_id or "f3rva-website"
-        api_url = (
-            f"https://api.f3nation.com/v1/event?regionIds={region_id}&statuses=active&pageSize=200"
-            f"&sorting[0][id]=dayOfWeek&sorting[0][desc]=&sorting[1][id]=parent&sorting[1][desc]="
-        )
+        page_size = 100
+        page_index = 0
+        all_events: list[dict[str, Any]] = []
 
-        req = urllib.request.Request(
-            api_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Client": client_id,
-                "Accept": "application/json",
-            },
-        )
+        while True:
+            api_url = (
+                f"https://api.f3nation.com/v1/event?regionIds={region_id}&statuses=active"
+                f"&pageSize={page_size}&pageIndex={page_index}"
+                f"&sorting[0][id]=dayOfWeek&sorting[0][desc]=&sorting[1][id]=parent&sorting[1][desc]="
+            )
 
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                events = data.get("events", [])
-                workouts = transform_events_to_workouts(events)
-                return WorkoutScheduleResponse(**{"1stF": workouts})
-        except HTTPException:
-            raise
-        except Exception as err:
-            logger.error("Failed to fetch schedule from F3 Nation API: %s", err, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail={"errorCode": 5002, "errorMessage": "Failed to fetch schedule from upstream F3 Nation API."},
-            ) from err
+            req = urllib.request.Request(
+                api_url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Client": client_id,
+                    "Accept": "application/json",
+                },
+            )
+
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    events = data.get("events", [])
+                    all_events.extend(events)
+                    total_count = data.get("totalCount", len(events))
+                    if len(all_events) >= total_count or not events:
+                        break
+                    page_index += 1
+            except HTTPException:
+                raise
+            except Exception as err:
+                logger.error("Failed to fetch schedule from F3 Nation API: %s", err, exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail={
+                        "errorCode": 5002,
+                        "errorMessage": "Failed to fetch schedule from upstream F3 Nation API.",
+                    },
+                ) from err
+
+        workouts = transform_events_to_workouts(all_events)
+        return WorkoutScheduleResponse(**{"1stF": workouts})

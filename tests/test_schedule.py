@@ -117,7 +117,9 @@ def test_get_workout_schedule_success(client: TestClient, monkeypatch: pytest.Mo
     assert data["1stF"][0]["name"] == "First Watch"
 
 
-def test_get_workout_schedule_missing_api_key(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_workout_schedule_missing_api_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Verify GET /schedule returns 500 when F3 Nation API key is missing."""
     settings = get_settings()
     monkeypatch.setattr(settings, "f3_nation_api_key", None)
@@ -148,4 +150,45 @@ def test_get_workout_schedule_upstream_failure(
     assert data["errorCode"] == 5002
     assert data["errorMessage"] == "Failed to fetch schedule from upstream F3 Nation API."
     assert "Upstream timeout" not in data["errorMessage"]
-    assert "Failed to fetch schedule from F3 Nation API: <urlopen error Upstream timeout>" in caplog.text
+    assert (
+        "Failed to fetch schedule from F3 Nation API: <urlopen error Upstream timeout>"
+        in caplog.text
+    )
+
+
+def test_get_workout_schedule_multi_page_pagination(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify GET /schedule paginates across multiple pages when totalCount exceeds pageSize."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "f3_nation_api_key", "test-api-key")
+
+    requested_urls: list[str] = []
+
+    def mock_paginated_urlopen(req, timeout=10):
+        url = req.full_url
+        requested_urls.append(url)
+        if "pageIndex=0" in url:
+            page_data = {
+                "events": [MOCK_F3_NATION_RESPONSE["events"][0]],
+                "totalCount": 2,
+            }
+        else:
+            page_data = {
+                "events": [MOCK_F3_NATION_RESPONSE["events"][1]],
+                "totalCount": 2,
+            }
+        return MockHTTPResponse(page_data)
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_paginated_urlopen)
+
+    response = client.get("/schedule")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["1stF"]) == 2
+    assert data["1stF"][0]["name"] == "First Watch"
+    assert data["1stF"][1]["name"] == "Spider Run"
+    assert len(requested_urls) == 2
+    assert "pageSize=100" in requested_urls[0]
+    assert "pageIndex=0" in requested_urls[0]
+    assert "pageIndex=1" in requested_urls[1]
