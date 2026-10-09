@@ -53,10 +53,16 @@ class MemberSlack(Base):
     member_id: Mapped[int] = mapped_column(
         "MEMBER_ID", Integer, ForeignKey("MEMBER.MEMBER_ID", ondelete="CASCADE"), nullable=False
     )
-    slack_display_name: Mapped[str | None] = mapped_column("SLACK_DISPLAY_NAME", String(255), nullable=True)
-    slack_real_name: Mapped[str | None] = mapped_column("SLACK_REAL_NAME", String(255), nullable=True)
+    slack_display_name: Mapped[str | None] = mapped_column(
+        "SLACK_DISPLAY_NAME", String(255), nullable=True
+    )
+    slack_real_name: Mapped[str | None] = mapped_column(
+        "SLACK_REAL_NAME", String(255), nullable=True
+    )
     slack_email: Mapped[str | None] = mapped_column("SLACK_EMAIL", String(255), nullable=True)
-    updated_at: Mapped[datetime.datetime | None] = mapped_column("UPDATED_AT", DateTime, nullable=True)
+    updated_at: Mapped[datetime.datetime | None] = mapped_column(
+        "UPDATED_AT", DateTime, nullable=True
+    )
 
 
 class MemberAliasRequest(Base):
@@ -78,13 +84,10 @@ class MemberAliasAudit(Base):
 
     __tablename__ = "MEMBER_ALIAS_AUDIT"
 
-    audit_id: Mapped[int] = mapped_column(
-        "AUDIT_ID", Integer, primary_key=True, autoincrement=True
-    )
-    old_member_id: Mapped[int] = mapped_column("OLD_MEMBER_ID", Integer, nullable=False)
+    old_member_id: Mapped[int] = mapped_column("OLD_MEMBER_ID", Integer, primary_key=True)
+    workout_id: Mapped[int] = mapped_column("WORKOUT_ID", Integer, primary_key=True)
+    member_type: Mapped[str] = mapped_column("MEMBER_TYPE", String(32), primary_key=True)
     old_f3_name: Mapped[str] = mapped_column("OLD_F3_NAME", String(255), nullable=False)
-    workout_id: Mapped[int] = mapped_column("WORKOUT_ID", Integer, nullable=False)
-    member_type: Mapped[str] = mapped_column("MEMBER_TYPE", String(32), nullable=False)
 
 
 class Workout(Base):
@@ -110,9 +113,7 @@ class WorkoutAO(Base):
     workout_id: Mapped[int] = mapped_column(
         "WORKOUT_ID", Integer, ForeignKey("WORKOUT.WORKOUT_ID"), primary_key=True
     )
-    ao_id: Mapped[int] = mapped_column(
-        "AO_ID", Integer, ForeignKey("AO.AO_ID"), primary_key=True
-    )
+    ao_id: Mapped[int] = mapped_column("AO_ID", Integer, ForeignKey("AO.AO_ID"), primary_key=True)
 
 
 class WorkoutQ(Base):
