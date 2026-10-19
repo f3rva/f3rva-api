@@ -14,11 +14,32 @@ from src.models.workout import (
     MemberAliasRequest,
     MemberSlack,
 )
+from src.services.email_service import EmailService
 from src.utils.logging import timed_service
 
 
 class AliasService:
     """Self-service alias requests, admin approval workflows, and transactional member record consolidation."""
+
+    @classmethod
+    def _get_member_email(cls, db: Session, member_id: int) -> str | None:
+        """Retrieve the most recently updated Slack email address for a member if available."""
+        slack_record = (
+            db.execute(
+                select(MemberSlack)
+                .where(
+                    MemberSlack.member_id == member_id,
+                    MemberSlack.slack_email.is_not(None),
+                )
+                .order_by(MemberSlack.updated_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+        if slack_record and slack_record.slack_email:
+            cleaned = slack_record.slack_email.strip()
+            return cleaned if cleaned else None
+        return None
 
     @classmethod
     @timed_service
@@ -65,9 +86,25 @@ class AliasService:
         db.add(new_req)
         db.commit()
 
+        primary_summary = MemberSummary(memberId=primary.member_id, f3Name=primary.f3_name)
+        alias_summary = MemberSummary(memberId=alias_member.member_id, f3Name=alias_member.f3_name)
+
+        requestor_email = cls._get_member_email(db, primary_id)
+        EmailService.send_alias_request_admin_notification(
+            primary_member=primary_summary,
+            alias_member=alias_summary,
+            requestor_email=requestor_email,
+        )
+        if requestor_email:
+            EmailService.send_alias_request_receipt_notification(
+                primary_member=primary_summary,
+                alias_member=alias_summary,
+                recipient_email=requestor_email,
+            )
+
         return AliasRequestResponse(
-            primaryMember=MemberSummary(memberId=primary.member_id, f3Name=primary.f3_name),
-            aliasMember=MemberSummary(memberId=alias_member.member_id, f3Name=alias_member.f3_name),
+            primaryMember=primary_summary,
+            aliasMember=alias_summary,
             status=new_req.status,
         )
 
@@ -101,29 +138,70 @@ class AliasService:
         ]
 
     @classmethod
+    def _transition_request_status(
+        cls, db: Session, primary_id: int, alias_id: int, new_status: str
+    ) -> None:
+        """Transition a pending alias request to new_status, removing any prior row with the same target status."""
+        db.execute(
+            text(
+                "DELETE FROM MEMBER_ALIAS_REQUEST "
+                "WHERE PRIMARY_ID = :p AND ALIAS_ID = :a AND STATUS = :target_status"
+            ),
+            {"p": primary_id, "a": alias_id, "target_status": new_status},
+        )
+        db.execute(
+            text(
+                "UPDATE MEMBER_ALIAS_REQUEST SET STATUS = :target_status "
+                "WHERE PRIMARY_ID = :p AND ALIAS_ID = :a AND STATUS = 'pending'"
+            ),
+            {"p": primary_id, "a": alias_id, "target_status": new_status},
+        )
+
+    @classmethod
     @timed_service
     def approve_alias(cls, db: Session, primary_id: int, alias_id: int) -> AliasRequestResponse:
         """Approve alias request: reassign workouts, generate audit trail, register alias, and delete duplicate member."""
-        req = db.execute(
+        pending_req = db.execute(
             select(MemberAliasRequest).where(
                 MemberAliasRequest.primary_id == primary_id,
                 MemberAliasRequest.alias_id == alias_id,
+                MemberAliasRequest.status == "pending",
             )
         ).scalar_one_or_none()
-        if not req:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"errorCode": 2005, "errorMessage": f"Alias request for primary {primary_id} and alias {alias_id} not found."},
+
+        if not pending_req:
+            existing_any = (
+                db.execute(
+                    select(MemberAliasRequest).where(
+                        MemberAliasRequest.primary_id == primary_id,
+                        MemberAliasRequest.alias_id == alias_id,
+                    )
+                )
+                .scalars()
+                .first()
             )
-        if req.status != "pending":
+            if not existing_any:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={"errorCode": 2005, "errorMessage": f"Alias request for primary {primary_id} and alias {alias_id} not found."},
+                )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"errorCode": 2006, "errorMessage": f"Alias request is already {req.status}."},
+                detail={"errorCode": 2006, "errorMessage": f"Alias request is already {existing_any.status}."},
             )
 
         res = cls._execute_member_merge(db=db, primary_id=primary_id, alias_id=alias_id)
-        req.status = "approved"
+        cls._transition_request_status(db, primary_id, alias_id, "approved")
         db.commit()
+
+        requestor_email = cls._get_member_email(db, primary_id)
+        if requestor_email:
+            EmailService.send_alias_approved_notification(
+                primary_member=res.primary_member,
+                alias_member=res.alias_member,
+                recipient_email=requestor_email,
+            )
+
         return res
 
     @classmethod
@@ -132,14 +210,15 @@ class AliasService:
         """Directly merge two members by an admin without requiring a prior pending request."""
         res = cls._execute_member_merge(db=db, primary_id=primary_id, alias_id=alias_id)
         # If a pending request happened to exist for them, mark it approved
-        req = db.execute(
+        pending_req = db.execute(
             select(MemberAliasRequest).where(
                 MemberAliasRequest.primary_id == primary_id,
                 MemberAliasRequest.alias_id == alias_id,
+                MemberAliasRequest.status == "pending",
             )
         ).scalar_one_or_none()
-        if req:
-            req.status = "approved"
+        if pending_req:
+            cls._transition_request_status(db, primary_id, alias_id, "approved")
         db.commit()
         return res
 
@@ -274,35 +353,58 @@ class AliasService:
     @timed_service
     def reject_alias(cls, db: Session, primary_id: int, alias_id: int) -> AliasRequestResponse:
         """Reject a pending alias request."""
-        req = db.execute(
+        pending_req = db.execute(
             select(MemberAliasRequest).where(
                 MemberAliasRequest.primary_id == primary_id,
                 MemberAliasRequest.alias_id == alias_id,
+                MemberAliasRequest.status == "pending",
             )
         ).scalar_one_or_none()
-        if not req:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"errorCode": 2005, "errorMessage": f"Alias request for primary {primary_id} and alias {alias_id} not found."},
+
+        if not pending_req:
+            existing_any = (
+                db.execute(
+                    select(MemberAliasRequest).where(
+                        MemberAliasRequest.primary_id == primary_id,
+                        MemberAliasRequest.alias_id == alias_id,
+                    )
+                )
+                .scalars()
+                .first()
             )
-        if req.status != "pending":
+            if not existing_any:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={"errorCode": 2005, "errorMessage": f"Alias request for primary {primary_id} and alias {alias_id} not found."},
+                )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"errorCode": 2006, "errorMessage": f"Alias request is already {req.status}."},
+                detail={"errorCode": 2006, "errorMessage": f"Alias request is already {existing_any.status}."},
             )
 
-        req.status = "rejected"
+        cls._transition_request_status(db, primary_id, alias_id, "rejected")
         db.commit()
 
-        primary = db.execute(select(Member).where(Member.member_id == req.primary_id)).scalar_one_or_none()
-        alias_member = db.execute(select(Member).where(Member.member_id == req.alias_id)).scalar_one_or_none()
+        primary = db.execute(select(Member).where(Member.member_id == primary_id)).scalar_one_or_none()
+        alias_member = db.execute(select(Member).where(Member.member_id == alias_id)).scalar_one_or_none()
+
+        primary_summary = MemberSummary(
+            memberId=primary_id, f3Name=primary.f3_name if primary else f"Member {primary_id}"
+        )
+        alias_summary = MemberSummary(
+            memberId=alias_id, f3Name=alias_member.f3_name if alias_member else f"Member {alias_id}"
+        )
+
+        requestor_email = cls._get_member_email(db, primary_id)
+        if requestor_email:
+            EmailService.send_alias_rejected_notification(
+                primary_member=primary_summary,
+                alias_member=alias_summary,
+                recipient_email=requestor_email,
+            )
 
         return AliasRequestResponse(
-            primaryMember=MemberSummary(
-                memberId=req.primary_id, f3Name=primary.f3_name if primary else f"Member {req.primary_id}"
-            ),
-            aliasMember=MemberSummary(
-                memberId=req.alias_id, f3Name=alias_member.f3_name if alias_member else f"Member {req.alias_id}"
-            ),
+            primaryMember=primary_summary,
+            aliasMember=alias_summary,
             status="rejected",
         )

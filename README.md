@@ -57,6 +57,7 @@ f3rva-api/
 │   │   ├── schedule_service.py        # Upstream F3 Nation API integration & event transformations
 │   │   ├── slack_auth_service.py      # Slack OAuth OIDC exchange, team ID verification & member linking
 │   │   ├── slack_notification_service.py# Block Kit backblast summaries dispatched to #backblasts
+│   │   ├── email_service.py           # AWS SES email notifications for alias requests & approvals
 │   │   ├── workout_service.py         # Derived table pagination & backblast queries (<15ms)
 │   │   ├── workout_mutation_service.py# Structured workout additions, author updates & transactional deletions
 │   │   ├── member_service.py          # Member profiles, attendance stats & search
@@ -65,12 +66,13 @@ f3rva-api/
 │   └── utils/
 │       ├── logging.py                 # Structured latency tracing decorator (@timed_service)
 │       └── security.py                # JWT creation, decoding, and Bearer token dependency
-└── tests/                             # Automated Pytest suite (100% test coverage)
+└── tests/                             # Automated Pytest suite
     ├── conftest.py                    # SQLite in-memory fixtures & TestClient setup
     ├── test_health.py                 # Health checks, docs, CORS & Mangum Lambda adapter
     ├── test_schedule.py               # Schedule API transformation, caching, and error handling
     ├── test_slack_auth.py             # Slack OAuth exchange, workspace enforcement & link confirmation
     ├── test_slack_notifications.py    # Block Kit message formatting & Slack WebClient dispatch
+    ├── test_email_service.py          # AWS SES alias request & approval email notification tests
     ├── test_workouts.py               # Workouts filtering, pagination & 404 handling
     ├── test_members.py                # Member stats, alias lookups & Q-ratio math
     ├── test_reports.py                # Streaker recursive algorithm & attendance reports
@@ -78,7 +80,7 @@ f3rva-api/
     ├── test_admin.py                  # JWT authentication, alias approvals, MEMBER_SLACK merges
     ├── test_database.py               # Database engine, session lifecycle & version tests
     ├── test_utils.py                  # Service latency tracking & logging decorator tests
-    └── run_tests.py                   # Standalone test runner script (104 tests)
+    └── run_tests.py                   # Standalone test runner script
 ```
 
 ---
@@ -111,6 +113,7 @@ The API strictly reads configuration from OS environment variables, local `.env`
 | Variable | Required | Description | Example / Default Value |
 | :--- | :--- | :--- | :--- |
 | `BACKBLAST_URL_PREFIX` | **Yes** | Base URL prefix for constructing backblast permalinks | `https://dev.f3rva.org` (dev) / `https://f3rva.org` (prod) |
+| `ADMIN_EMAIL` | Optional | Admin email address for AWS SES alias request & approval notifications | `admin@dev.f3rva.org` (dev) / `admin@f3rva.org` (prod) |
 | `DATABASE_URL` | **Yes** | MySQL connection URL with URL-encoded password | `mysql+pymysql://user:pass@host:3306/db?charset=utf8mb4` |
 | `DB_POOL_PRE_PING` | Optional | Proactively test and reconnect dropped connections | `true` (default: `true`) |
 | `DB_POOL_RECYCLE` | Optional | Connection recycle duration in seconds (idle timeout prevention) | `300` (default: `300`) |
@@ -206,8 +209,8 @@ Alternatively, in the AWS Console: Navigate to **CloudFront > Distributions** an
 
 ### Slack App Permissions & Redirect URLs (api.slack.com/apps)
 1. **OAuth & Permissions > Redirect URLs**:
-   - Add frontend callback URLs:
-     - `http://localhost:3000/auth/slack/callback` (or your local frontend dev port)
+   - Add frontend callback URLs (Slack requires `https://`):
+     - `https://localhost:3000/auth/slack/callback` (local frontend dev server)
      - `https://dev.f3rva.org/auth/slack/callback`
      - `https://f3rva.org/auth/slack/callback`
    - Click **Save URLs**.
@@ -235,6 +238,7 @@ Store the following parameters under `/f3rva/dev/` and `/f3rva/prod/`:
 | `slack_allowed_team_id` | Enforced Workspace Team ID | `T_DEV_123` | `T_PROD_456` |
 | `slack_backblast_channel_id` | Slack Channel ID for Backblasts | `C_DEV_TEST` | `C_PROD_BACKBLASTS` |
 | `backblast_url_prefix` | Base URL prefix for backblast permalinks | `https://dev.f3rva.org` | `https://f3rva.org` |
+| `admin_email` | Admin email address for AWS SES notifications | `admin@dev.f3rva.org` | `admin@f3rva.org` |
 | `db_pool_pre_ping` | *(Optional)* Proactive connection pinging | `true` | `true` |
 | `db_pool_recycle` | *(Optional)* Connection recycle timeout (seconds) | `300` | `300` |
 

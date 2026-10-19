@@ -66,7 +66,7 @@ class MemberSlack(Base):
 
 
 class MemberAliasRequest(Base):
-    """Member Alias Claim Request entity using composite primary key (PRIMARY_ID, ALIAS_ID)."""
+    """Member Alias Claim Request entity using composite primary key (PRIMARY_ID, ALIAS_ID, STATUS)."""
 
     __tablename__ = "MEMBER_ALIAS_REQUEST"
 
@@ -76,7 +76,9 @@ class MemberAliasRequest(Base):
     alias_id: Mapped[int] = mapped_column(
         "ALIAS_ID", Integer, ForeignKey("MEMBER.MEMBER_ID"), primary_key=True
     )
-    status: Mapped[str] = mapped_column("STATUS", String(32), default="pending", nullable=False)
+    status: Mapped[str] = mapped_column(
+        "STATUS", String(32), default="pending", primary_key=True, nullable=False
+    )
 
 
 class MemberAliasAudit(Base):

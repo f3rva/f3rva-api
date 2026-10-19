@@ -96,8 +96,9 @@ class Settings(BaseSettings):
     slack_allowed_team_id: str | None = Field(default=None, description="Allowed Slack Team/Workspace ID (e.g., f3-rva-workspace)")
     slack_backblast_channel_id: str | None = Field(default=None, description="Slack Channel ID for #backblasts notifications")
 
-    # Backblast Configuration
+    # Backblast & Email Configuration
     backblast_url_prefix: str | None = Field(default=None, description="Public site base URL prefix for constructing backblast permalinks")
+    admin_email: str | None = Field(default=None, description="Admin email address for SES notifications (e.g., admin@f3rva.org)")
 
     # CORS Configuration
     cors_allowed_origins: str | None = Field(default=None, description="Optional comma-separated list of additional allowed CORS origins")
