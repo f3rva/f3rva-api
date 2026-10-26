@@ -32,6 +32,10 @@ def mock_slack_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure no live Slack notifications are ever dispatched during workout mutation tests."""
     monkeypatch.setattr(
         "src.services.workout_mutation_service.SlackNotificationService.post_backblast_summary",
+        lambda *args, **kwargs: "1729946793.000200",
+    )
+    monkeypatch.setattr(
+        "src.services.workout_mutation_service.SlackNotificationService.update_backblast_summary",
         lambda *args, **kwargs: True,
     )
 
@@ -311,14 +315,15 @@ def test_update_workout_success(client: TestClient, db_session: Session, auth_he
     data = update_res.json()
     assert data["id"] == workout_id
 
-    # 3. Verify DB record updates
+    # 3. Verify DB record updates (original author Dingo is retained)
     w = db_session.query(Workout).filter(Workout.workout_id == workout_id).first()
     assert w is not None
     assert w.title == "Updated Beatdown"
     assert w.workout_date == datetime.date(2026, 8, 2)
-    assert w.author == "Splinter"
+    assert w.author == "Dingo"
     assert w.slug == "updated-beatdown"
     assert w.backblast_url == "https://f3rva.org/2026/08/02/updated-beatdown"
+    assert w.slack_message_ts == "1729946793.000200"
 
     # Details updated
     det = db_session.query(WorkoutDetails).filter(WorkoutDetails.workout_id == workout_id).first()
@@ -654,5 +659,110 @@ def test_update_workout_with_fngs_and_drs(
     assert data["fngs"][0]["f3Name"] == "NewGuy"
     assert len(data["drs"]) == 1
     assert data["drs"][0]["f3Name"] == "SeattleGuy"
+
+
+def test_update_workout_triggers_slack_update_when_ts_exists(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str], admin_headers: dict[str, str]
+) -> None:
+    """Verify updating a workout with a stored slack_message_ts invokes update_backblast_summary with original author."""
+    with patch(
+        "src.services.workout_mutation_service.SlackNotificationService.post_backblast_summary",
+        return_value="1729946999.123456",
+    ) as mock_post, patch(
+        "src.services.workout_mutation_service.SlackNotificationService.update_backblast_summary",
+        return_value=True,
+    ) as mock_update:
+        # 1. Create workout as Dingo
+        create_res = client.post(
+            "/v2/workouts",
+            json={
+                "title": "Slack Tracked Beatdown",
+                "workoutDate": "2026-08-05",
+                "qic": ["Dingo"],
+                "pax": ["Dingo", "Lab Rat"],
+                "aos": [{"name": "First Watch"}],
+                "author": "Dingo",
+                "slug": "slack-tracked-beatdown",
+            },
+            headers=auth_headers,
+        )
+        assert create_res.status_code == 201
+        wid = create_res.json()["id"]
+        assert mock_post.called
+
+        workout = db_session.query(Workout).filter(Workout.workout_id == wid).first()
+        assert workout is not None
+        assert workout.slack_message_ts == "1729946999.123456"
+
+        # 2. Admin updates workout PAX list and sends "Admin" as payload author
+        update_res = client.put(
+            f"/v2/workouts/{wid}",
+            json={
+                "title": "Slack Tracked Beatdown",
+                "workoutDate": "2026-08-05",
+                "qic": ["Dingo"],
+                "pax": ["Dingo", "Lab Rat", "Splinter"],
+                "fngs": ["Rookie"],
+                "drs": ["Outlaw"],
+                "aos": [{"name": "First Watch"}],
+                "author": "Admin",
+                "slug": "slack-tracked-beatdown",
+            },
+            headers=admin_headers,
+        )
+        assert update_res.status_code == 200
+        assert mock_update.called
+        call_kwargs = mock_update.call_args.kwargs
+        assert call_kwargs["slack_ts"] == "1729946999.123456"
+        assert call_kwargs["author"] == "Dingo"
+        assert call_kwargs["pax_names"] == ["Dingo", "Lab Rat", "Splinter"]
+        assert call_kwargs["fng_names"] == ["Rookie"]
+        assert call_kwargs["dr_names"] == ["Outlaw"]
+
+
+def test_update_workout_skips_slack_update_when_ts_is_none(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str]
+) -> None:
+    """Verify updating a legacy workout without slack_message_ts does not call update_backblast_summary."""
+    with patch(
+        "src.services.workout_mutation_service.SlackNotificationService.post_backblast_summary",
+        return_value=None,
+    ), patch(
+        "src.services.workout_mutation_service.SlackNotificationService.update_backblast_summary",
+        return_value=True,
+    ) as mock_update:
+        create_res = client.post(
+            "/v2/workouts",
+            json={
+                "title": "Legacy Workout Without Slack TS",
+                "workoutDate": "2026-08-06",
+                "qic": ["Dingo"],
+                "pax": ["Dingo"],
+                "aos": [{"name": "First Watch"}],
+                "slug": "legacy-workout",
+            },
+            headers=auth_headers,
+        )
+        assert create_res.status_code == 201
+        wid = create_res.json()["id"]
+
+        workout = db_session.query(Workout).filter(Workout.workout_id == wid).first()
+        assert workout is not None
+        assert workout.slack_message_ts is None
+
+        update_res = client.put(
+            f"/v2/workouts/{wid}",
+            json={
+                "title": "Legacy Workout Updated",
+                "workoutDate": "2026-08-06",
+                "qic": ["Dingo"],
+                "pax": ["Dingo", "Lab Rat"],
+                "aos": [{"name": "First Watch"}],
+                "slug": "legacy-workout",
+            },
+            headers=auth_headers,
+        )
+        assert update_res.status_code == 200
+        assert not mock_update.called
 
 

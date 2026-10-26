@@ -97,9 +97,12 @@ class WorkoutMutationService:
 
             db.commit()
 
-            # Dispatch Slack Notification
-            ao_names = [a.name if isinstance(a, AOInput) else str(a) for a in (data.aos if isinstance(data.aos, list) else [data.aos])]
-            SlackNotificationService.post_backblast_summary(
+            # Dispatch Slack Notification and persist message timestamp ('ts') if returned
+            ao_names = [
+                a.name if isinstance(a, AOInput) else str(a)
+                for a in (data.aos if isinstance(data.aos, list) else [data.aos])
+            ]
+            slack_ts = SlackNotificationService.post_backblast_summary(
                 title=data.title,
                 workout_date=str(parsed_date),
                 url=resolved_url,
@@ -110,6 +113,9 @@ class WorkoutMutationService:
                 fng_names=fng_names,
                 dr_names=dr_names,
             )
+            if isinstance(slack_ts, str) and slack_ts:
+                new_workout.slack_message_ts = slack_ts
+                db.commit()
 
             return WorkoutCreatedResponse(id=wid, url=resolved_url)
         except IntegrityError:
@@ -167,10 +173,10 @@ class WorkoutMutationService:
             f"{prefix}/{parsed_date.strftime('%Y/%m/%d')}/{data.slug}" if (prefix and data.slug) else workout.backblast_url
         )
 
-        # Update workout core entity attributes
+        # Update workout core entity attributes (retain original author unless previously empty)
         workout.workout_date = parsed_date
         workout.title = data.title
-        if data.author:
+        if not workout.author and data.author:
             workout.author = data.author
         workout.slug = data.slug
         workout.backblast_url = resolved_url
@@ -194,6 +200,25 @@ class WorkoutMutationService:
         )
 
         db.commit()
+
+        # Update Slack Notification if a message timestamp was recorded for this workout
+        if workout.slack_message_ts:
+            ao_names = [
+                a.name if isinstance(a, AOInput) else str(a)
+                for a in (data.aos if isinstance(data.aos, list) else [data.aos])
+            ]
+            SlackNotificationService.update_backblast_summary(
+                slack_ts=workout.slack_message_ts,
+                title=data.title,
+                workout_date=str(parsed_date),
+                url=resolved_url,
+                author=workout.author,
+                aos=ao_names,
+                q_names=q_names,
+                pax_names=pax_names,
+                fng_names=fng_names,
+                dr_names=dr_names,
+            )
 
         return WorkoutUpdatedResponse(
             id=workout_id,
