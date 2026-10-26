@@ -105,6 +105,9 @@ class Workout(Base):
     author: Mapped[str | None] = mapped_column("AUTHOR", String(255), nullable=True)
     slug: Mapped[str | None] = mapped_column("SLUG", String(255), nullable=True)
     backblast_url: Mapped[str | None] = mapped_column("BACKBLAST_URL", String(512), nullable=True)
+    slack_message_ts: Mapped[str | None] = mapped_column(
+        "SLACK_MESSAGE_TS", String(32), nullable=True
+    )
 
 
 class WorkoutAO(Base):
