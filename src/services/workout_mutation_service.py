@@ -30,6 +30,7 @@ from src.models.workout import (
     WorkoutPax,
     WorkoutQ,
 )
+from src.services.ai_summary_service import AISummaryService
 from src.services.slack_notification_service import SlackNotificationService
 from src.utils.logging import timed_service
 
@@ -102,6 +103,7 @@ class WorkoutMutationService:
                 a.name if isinstance(a, AOInput) else str(a)
                 for a in (data.aos if isinstance(data.aos, list) else [data.aos])
             ]
+            summary = AISummaryService.generate_tldr_summary(title=data.title, body=data.body)
             slack_ts = SlackNotificationService.post_backblast_summary(
                 title=data.title,
                 workout_date=str(parsed_date),
@@ -112,6 +114,7 @@ class WorkoutMutationService:
                 pax_names=pax_names,
                 fng_names=fng_names,
                 dr_names=dr_names,
+                summary=summary,
             )
             if isinstance(slack_ts, str) and slack_ts:
                 new_workout.slack_message_ts = slack_ts
@@ -207,6 +210,7 @@ class WorkoutMutationService:
                 a.name if isinstance(a, AOInput) else str(a)
                 for a in (data.aos if isinstance(data.aos, list) else [data.aos])
             ]
+            summary = AISummaryService.generate_tldr_summary(title=data.title, body=data.body)
             SlackNotificationService.update_backblast_summary(
                 slack_ts=workout.slack_message_ts,
                 title=data.title,
@@ -218,6 +222,7 @@ class WorkoutMutationService:
                 pax_names=pax_names,
                 fng_names=fng_names,
                 dr_names=dr_names,
+                summary=summary,
             )
 
         return WorkoutUpdatedResponse(

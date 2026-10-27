@@ -398,3 +398,37 @@ def test_update_backblast_summary_skipped_when_unconfigured_or_missing_ts() -> N
         )
         assert res_no_token is False
 
+
+def test_slack_notification_includes_sanitized_tldr_summary_block() -> None:
+    """Verify TL;DR summary block is inserted below header and escapes mrkdwn control characters."""
+    import json
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b'{"ok": true, "ts": "1729946793.000200"}'
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("src.services.slack_notification_service.get_settings") as mock_settings, \
+         patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        mock_settings.return_value.slack_bot_token = "xoxb-test-token"
+        mock_settings.return_value.slack_backblast_channel_id = "C12345"
+        mock_settings.return_value.backblast_url_prefix = "https://f3rva.org"
+
+        res = SlackNotificationService.post_backblast_summary(
+            title="Summary Beatdown",
+            workout_date="2026-08-15",
+            url="https://f3rva.org/summary-beatdown",
+            author="Dingo",
+            aos=["Dogpile"],
+            q_names=["Dingo"],
+            pax_names=["Dingo", "Lab Rat"],
+            summary="10 PAX crushed hill repeats & merkins <!channel>.",
+        )
+        assert res == "1729946793.000200"
+        req = mock_urlopen.call_args[0][0]
+        payload = json.loads(req.data.decode("utf-8"))
+        blocks = payload["blocks"]
+        assert len(blocks) == 4
+        assert blocks[1]["type"] == "section"
+        assert blocks[1]["text"]["text"] == "> *TL;DR:* _10 PAX crushed hill repeats &amp; merkins &lt;!channel&gt;._"
+
+

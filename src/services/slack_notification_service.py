@@ -50,6 +50,7 @@ class SlackNotificationService:
         fng_names: list[str] | None = None,
         dr_names: list[str] | None = None,
         backblast_url_prefix: str | None = None,
+        summary: str | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         """Build sanitized fallback text and Block Kit blocks for a workout summary."""
         # Escape untrusted user input against mrkdwn and mention injection
@@ -61,6 +62,7 @@ class SlackNotificationService:
         escaped_pax = [_escape_mrkdwn(p) for p in pax_names]
         escaped_fngs = [_escape_mrkdwn(f) for f in (fng_names or [])]
         escaped_drs = [_escape_mrkdwn(d) for d in (dr_names or [])]
+        escaped_summary = _escape_mrkdwn(summary.strip()) if summary and summary.strip() else None
 
         # Format location and attendees
         ao_str = ", ".join(escaped_aos) if escaped_aos else "Unspecified AO"
@@ -103,17 +105,31 @@ class SlackNotificationService:
                     "text": header_text,
                 },
             },
-            {
-                "type": "section",
-                "fields": fields,
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {"type": "mrkdwn", "text": footer_text},
-                ],
-            },
         ]
+        if escaped_summary:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"> *TL;DR:* _{escaped_summary}_",
+                    },
+                }
+            )
+        blocks.extend(
+            [
+                {
+                    "type": "section",
+                    "fields": fields,
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {"type": "mrkdwn", "text": footer_text},
+                    ],
+                },
+            ]
+        )
 
         fallback_text = f"{escaped_title} ({escaped_date}) at {ao_str}"
         return fallback_text, blocks
@@ -175,6 +191,7 @@ class SlackNotificationService:
         pax_names: list[str],
         fng_names: list[str] | None = None,
         dr_names: list[str] | None = None,
+        summary: str | None = None,
     ) -> str | None:
         """Post a structured Block Kit message summarizing a workout backblast and return the Slack 'ts'."""
         settings = get_settings()
@@ -193,6 +210,7 @@ class SlackNotificationService:
             fng_names=fng_names,
             dr_names=dr_names,
             backblast_url_prefix=settings.backblast_url_prefix,
+            summary=summary,
         )
 
         payload: dict[str, Any] = {
@@ -228,6 +246,7 @@ class SlackNotificationService:
         pax_names: list[str],
         fng_names: list[str] | None = None,
         dr_names: list[str] | None = None,
+        summary: str | None = None,
     ) -> bool:
         """Update an existing Slack backblast message in-place via chat.update using its 'ts'."""
         settings = get_settings()
@@ -246,6 +265,7 @@ class SlackNotificationService:
             fng_names=fng_names,
             dr_names=dr_names,
             backblast_url_prefix=settings.backblast_url_prefix,
+            summary=summary,
         )
 
         payload: dict[str, Any] = {

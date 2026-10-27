@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     backblast_url_prefix: str | None = Field(default=None, description="Public site base URL prefix for constructing backblast permalinks")
     admin_email: str | None = Field(default=None, description="Admin email address for SES notifications (e.g., admin@f3rva.org)")
 
+    # AI / AWS Bedrock Configuration
+    bedrock_model_id: str | None = Field(default=None, description="AWS Bedrock model or inference profile ID for backblast summarization")
+
     # CORS Configuration
     cors_allowed_origins: str | None = Field(default=None, description="Optional comma-separated list of additional allowed CORS origins")
 
