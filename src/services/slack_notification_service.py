@@ -66,9 +66,7 @@ class SlackNotificationService:
         ao_str = ", ".join(escaped_aos) if escaped_aos else "Unspecified AO"
         q_str = ", ".join(escaped_qs) if escaped_qs else "None recorded"
         pax_count = len(escaped_pax)
-        pax_preview = ", ".join(escaped_pax[:8]) + (
-            f" (+{pax_count - 8} more)" if pax_count > 8 else ""
-        )
+        pax_str = ", ".join(escaped_pax)
 
         # Validate URL scheme to prevent link hijacking or malformed <None|...> headers
         prefix = (
@@ -86,7 +84,7 @@ class SlackNotificationService:
             {"type": "mrkdwn", "text": f"*Date:* {escaped_date}"},
             {"type": "mrkdwn", "text": f"*AO:* {ao_str}"},
             {"type": "mrkdwn", "text": f"*QIC:*\n{q_str}"},
-            {"type": "mrkdwn", "text": f"*PAX ({pax_count}):*\n{pax_preview}"},
+            {"type": "mrkdwn", "text": f"*PAX ({pax_count}):*\n{pax_str}"},
         ]
         if escaped_fngs:
             fng_str = ", ".join(escaped_fngs)
