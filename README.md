@@ -54,6 +54,7 @@ f3rva-api/
 │   │   ├── aliases.py                 # /v2/aliases (self-service claim requests)
 │   │   └── admin.py                   # /v2/admin (JWT login, approve, reject, merge records)
 │   ├── services/                      # Core business logic layer
+│   │   ├── ai_summary_service.py      # AWS Bedrock Converse API 1-2 sentence TL;DR summarization
 │   │   ├── schedule_service.py        # Upstream F3 Nation API integration & event transformations
 │   │   ├── slack_auth_service.py      # Slack OAuth OIDC exchange, team ID verification & member linking
 │   │   ├── slack_notification_service.py# Block Kit backblast summaries dispatched to #backblasts
@@ -68,6 +69,7 @@ f3rva-api/
 │       └── security.py                # JWT creation, decoding, and Bearer token dependency
 └── tests/                             # Automated Pytest suite
     ├── conftest.py                    # SQLite in-memory fixtures & TestClient setup
+    ├── test_ai_summary_service.py     # AWS Bedrock Converse API TL;DR summarization tests
     ├── test_health.py                 # Health checks, docs, CORS & Mangum Lambda adapter
     ├── test_schedule.py               # Schedule API transformation, caching, and error handling
     ├── test_slack_auth.py             # Slack OAuth exchange, workspace enforcement & link confirmation
@@ -125,6 +127,7 @@ The API strictly reads configuration from OS environment variables, local `.env`
 | `SLACK_CLIENT_SECRET` | Optional | Slack App Client Secret for Sign in with Slack | OAuth client secret |
 | `SLACK_BOT_TOKEN` | Optional | Slack Bot Token for backblast channel notifications | `xoxb-...` |
 | `SLACK_BACKBLAST_CHANNEL_ID` | Optional | Channel ID for backblast notification cards | `C0123456789` |
+| `BEDROCK_MODEL_ID` | Optional | AWS Bedrock model or inference profile ID for AI backblast TL;DR summaries | `global.anthropic.claude-haiku-4-5-20251001-v1:0` |
 
 ### Running the API Locally
 Start the development server with live auto-reload:
@@ -239,6 +242,7 @@ Store the following parameters under `/f3rva/dev/` and `/f3rva/prod/`:
 | `slack_backblast_channel_id` | Slack Channel ID for Backblasts | `C_DEV_TEST` | `C_PROD_BACKBLASTS` |
 | `backblast_url_prefix` | Base URL prefix for backblast permalinks | `https://dev.f3rva.org` | `https://f3rva.org` |
 | `admin_email` | Admin email address for AWS SES notifications | `admin@dev.f3rva.org` | `admin@f3rva.org` |
+| `bedrock_model_id` | *(Optional)* AWS Bedrock model/inference profile ID for AI TL;DR summaries | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` |
 | `db_pool_pre_ping` | *(Optional)* Proactive connection pinging | `true` | `true` |
 | `db_pool_recycle` | *(Optional)* Connection recycle timeout (seconds) | `300` | `300` |
 

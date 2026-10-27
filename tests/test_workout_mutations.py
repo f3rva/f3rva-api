@@ -720,6 +720,65 @@ def test_update_workout_triggers_slack_update_when_ts_exists(
         assert call_kwargs["dr_names"] == ["Outlaw"]
 
 
+def test_add_and_update_workout_pass_ai_summary_to_slack(
+    client: TestClient, db_session: Session, auth_headers: dict[str, str]
+) -> None:
+    """Verify add_workout and update_workout pass the AI-generated TL;DR summary to SlackNotificationService."""
+    with patch(
+        "src.services.workout_mutation_service.AISummaryService.generate_tldr_summary",
+        return_value="Dingo led 15 PAX through 200 merkins and hill sprints at First Watch.",
+    ) as mock_ai, patch(
+        "src.services.workout_mutation_service.SlackNotificationService.post_backblast_summary",
+        return_value="1729947000.000100",
+    ) as mock_post, patch(
+        "src.services.workout_mutation_service.SlackNotificationService.update_backblast_summary",
+        return_value=True,
+    ) as mock_update:
+        create_res = client.post(
+            "/v2/workouts",
+            json={
+                "title": "AI Summary Beatdown",
+                "workoutDate": "2026-08-05",
+                "qic": ["Dingo"],
+                "pax": ["Dingo", "Lab Rat"],
+                "aos": [{"name": "First Watch"}],
+                "body": "<p>We did 200 merkins and hill sprints at First Watch.</p>",
+                "author": "Dingo",
+                "slug": "ai-summary-beatdown",
+            },
+            headers=auth_headers,
+        )
+        assert create_res.status_code == 201
+        wid = create_res.json()["id"]
+        assert mock_ai.call_count == 1
+        assert (
+            mock_post.call_args.kwargs["summary"]
+            == "Dingo led 15 PAX through 200 merkins and hill sprints at First Watch."
+        )
+
+        update_res = client.put(
+            f"/v2/workouts/{wid}",
+            json={
+                "title": "AI Summary Beatdown Updated",
+                "workoutDate": "2026-08-05",
+                "qic": ["Dingo"],
+                "pax": ["Dingo", "Lab Rat", "Splinter"],
+                "aos": [{"name": "First Watch"}],
+                "body": "<p>We did 200 merkins and hill sprints at First Watch.</p>",
+                "author": "Dingo",
+                "slug": "ai-summary-beatdown",
+            },
+            headers=auth_headers,
+        )
+        assert update_res.status_code == 200
+        assert mock_ai.call_count == 2
+        assert (
+            mock_update.call_args.kwargs["summary"]
+            == "Dingo led 15 PAX through 200 merkins and hill sprints at First Watch."
+        )
+
+
+
 def test_update_workout_skips_slack_update_when_ts_is_none(
     client: TestClient, db_session: Session, auth_headers: dict[str, str]
 ) -> None:
