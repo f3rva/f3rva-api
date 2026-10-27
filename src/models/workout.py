@@ -149,7 +149,7 @@ class WorkoutPax(Base):
 
 
 class WorkoutDetails(Base):
-    """1:1 metadata and scraped HTML content for workouts."""
+    """1:1 metadata and HTML content for workouts."""
 
     __tablename__ = "WORKOUT_DETAILS"
 

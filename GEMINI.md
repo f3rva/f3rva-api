@@ -31,40 +31,53 @@ AI agents must preserve and respect the following package hierarchy:
 ```text
 src/
 ├── __init__.py
-├── main.py                     # Central FastAPI application & Mangum handler
-├── config/                     # Configuration, settings & database session pool
+├── main.py                              # Central FastAPI application & Mangum handler
+├── config/                              # Configuration, settings & database session pool
 │   ├── __init__.py
-│   ├── settings.py             # Parses env vars & reads AWS SSM Parameter Store
-│   ├── database.py             # SQLAlchemy 2.0 engine, SessionLocal & get_db dependency
-│   └── version.py              # Dynamic Git tag and package version resolution
-├── models/                     # Data definitions
-│   ├── __init__.py
-│   ├── workout.py              # WORKOUT, WORKOUT_AO, WORKOUT_Q, WORKOUT_PAX, WORKOUT_DETAILS
-│   ├── member.py               # MEMBER, MEMBER_ALIAS, ALIAS_REQUEST
-│   └── schemas.py              # Pydantic v2 request & response schemas
-├── routers/                    # Controller layer (Thin Routers)
-│   ├── __init__.py
-│   ├── workouts.py             # /v2/workouts (paginated, by-date, by-ao, by-slug)
-│   ├── members.py              # /v2/members (profiles, stats, workout history)
-│   ├── reports.py              # /v2/reports (attendance, AO averages, day-of-week, streakers)
-│   ├── self_service.py         # /v2/aliases (claim alias requests)
-│   ├── admin.py                # /v2/admin (login, approve, reject, merge pax)
-│   └── schedule.py             # /schedule (F3 Nation proxy)
-└── services/                   # Business Logic Layer (Free of transport details)
+│   ├── settings.py                      # Parses env vars & reads AWS SSM Parameter Store
+│   ├── database.py                      # SQLAlchemy 2.0 engine, SessionLocal & get_db dependency
+│   └── version.py                       # Dynamic Git tag and package version resolution
+├── models/                              # Data definitions
+│   ├── workout.py                       # SQLAlchemy 2.0 ORM models (WORKOUT, AO, MEMBER, MEMBER_SLACK, etc.)
+│   └── schemas.py                       # Pydantic v2 request & response schemas
+├── routers/                             # Controller layer (Thin Routers)
+│   ├── schedule.py                      # /schedule (F3 Nation proxy)
+│   ├── auth.py                          # /v2/auth (Slack OAuth login, link confirmation, user profile)
+│   ├── workouts.py                      # /v2/workouts (read, filter, structured add/edit, delete, aos list)
+│   ├── members.py                       # /v2/members (profiles, stats, workout history, lookup)
+│   ├── reports.py                       # /v2/reports (attendance, AO averages, day-of-week, streakers)
+│   ├── aliases.py                       # /v2/aliases (self-service claim requests)
+│   └── admin.py                         # /v2/admin (login, approve, reject, merge records)
+├── services/                            # Business Logic Layer (Free of transport details)
+│   ├── schedule_service.py              # Upstream F3 Nation API integration & event transformations
+│   ├── slack_auth_service.py            # Slack OAuth OIDC exchange, team ID verification & member linking
+│   ├── slack_notification_service.py    # Block Kit backblast summaries dispatched to #backblasts
+│   ├── email_service.py                 # AWS SES email notifications for alias requests & approvals
+│   ├── workout_service.py               # Workout query composition & pagination math
+│   ├── workout_mutation_service.py      # Structured workout additions, author updates & transactional deletions
+│   ├── member_service.py                # Member profiles, attendance stats & search
+│   ├── report_service.py                # Attendance aggregations & recursive streakers algorithm
+│   └── alias_service.py                 # Multi-table atomic alias merger, audit & MEMBER_SLACK reconciliation
+└── utils/
     ├── __init__.py
-    ├── workout_service.py      # Workout query composition & pagination math
-    ├── member_service.py       # Atomic multi-table alias merger & stats calculations
-    ├── report_service.py       # Attendance aggregations & recursive streakers algorithm
-    ├── admin_service.py        # Password hashing & JWT token verification
-    └── scraper_service.py      # Backblast HTML parser (BeautifulSoup4)
-tests/                          # Pytest suite
-    ├── conftest.py             # SQLite in-memory fixtures & TestClient instance
+    ├── logging.py                       # Structured latency tracing decorator (@timed_service)
+    └── security.py                      # JWT creation, decoding, and Bearer token dependency
+tests/                                   # Pytest suite
+    ├── __init__.py
+    ├── conftest.py                      # SQLite in-memory fixtures & TestClient instance
     ├── test_health.py
+    ├── test_schedule.py
+    ├── test_slack_auth.py
+    ├── test_slack_notifications.py
+    ├── test_email_service.py
     ├── test_workouts.py
+    ├── test_workout_mutations.py
     ├── test_members.py
     ├── test_reports.py
-    ├── test_alias_transactions.py
-    └── test_admin_auth.py
+    ├── test_admin.py
+    ├── test_database.py
+    ├── test_utils.py
+    └── run_tests.py
 ```
 
 ---
@@ -91,7 +104,7 @@ AI agents MUST adhere unconditionally to the **OWASP API Security Top 10** stand
 ### D. OWASP API4: Unrestricted Resource Consumption (DoS / Rate Limiting / Pagination)
 * **Mandatory Pagination Caps**: All list endpoints (`/v2/workouts`, `/v2/members`) must enforce strict upper limits (`limit <= 100`, default `20`) to prevent memory exhaustion attacks.
 * **Database Connection Limits**: Enforce `pool_size=5`, `max_overflow=2`, and `pool_timeout=10` on database engine connections.
-* **Request Timeout Protection**: External HTTP requests (e.g., F3 Nation API proxy or backblast scraper) must enforce explicit timeouts (`timeout=10`).
+* **Request Timeout Protection**: External HTTP requests (e.g., F3 Nation API proxy or Slack OAuth/WebClient calls) must enforce explicit timeouts (`timeout=10`).
 
 ### E. OWASP API5: Broken Function Level Authorization
 * Clearly delineate public read endpoints (`GET /v2/workouts/*`, `GET /v2/members/*`, `GET /v2/reports/*`, `POST /v2/aliases/request`) from protected administrative operations (`POST /v2/admin/*`).
@@ -102,8 +115,8 @@ AI agents MUST adhere unconditionally to the **OWASP API Security Top 10** stand
 * **Atomic Multi-Table Safety**: Any multi-table update (such as `assign_alias` or `merge_pax`) must use atomic transactions with guaranteed rollback on exceptions to prevent corrupted state.
 
 ### G. OWASP API7: Server-Side Request Forgery (SSRF) Protection
-* When scraping backblast URLs:
-  * Only allow HTTP/HTTPS URLs targeting approved domains (`f3rva.org`, `dev.f3rva.org`, or explicit F3 sites).
+* When making outbound HTTP requests or validating external URLs:
+  * Only connect to trusted, fixed upstream endpoints (e.g., `api.f3nation.com`, `slack.com`) and never fetch arbitrary user-supplied URLs.
   * Block internal network IP ranges, private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback addresses (`127.0.0.1`, `localhost`), and the AWS metadata endpoint (`169.254.169.254`).
 
 ### H. OWASP API8: Security Misconfiguration & Information Leakage
