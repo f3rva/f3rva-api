@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import html
 import logging
 import os
 import re
 from typing import Any
-
-from bs4 import BeautifulSoup
 
 from src.config.settings import get_settings
 from src.utils.logging import timed_service
@@ -42,13 +41,13 @@ class AISummaryService:
 
     @staticmethod
     def _strip_html(raw_body: str | None) -> str:
-        """Strip HTML tags, remove XML boundary breakout tokens, and collapse whitespace."""
+        """Strip HTML tags, unescape entities, remove XML boundary tokens, and collapse whitespace."""
         if not raw_body or not raw_body.strip():
             return ""
-        soup = BeautifulSoup(raw_body, "html.parser")
-        plain = soup.get_text(separator=" ", strip=True)
+        no_tags = re.sub(r"<[^>]+>", " ", raw_body)
+        unescaped = html.unescape(no_tags)
         # Prevent closing/opening <backblast> XML delimiter breakout
-        sanitized = re.sub(r"</?\s*backblast\s*>", " ", plain, flags=re.IGNORECASE)
+        sanitized = re.sub(r"</?\s*backblast\s*>", " ", unescaped, flags=re.IGNORECASE)
         return " ".join(sanitized.split())
 
     @staticmethod
