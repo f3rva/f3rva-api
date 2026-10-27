@@ -27,6 +27,8 @@ def test_slack_notification_skipped_if_unconfigured() -> None:
 
 def test_slack_notification_success() -> None:
     """Verify Block Kit message is constructed and sent successfully via Slack API, returning message ts."""
+    import json
+
     mock_resp = MagicMock()
     mock_resp.read.return_value = b'{"ok": true, "ts": "1729946793.000200"}'
     mock_resp.__enter__.return_value = mock_resp
@@ -48,6 +50,13 @@ def test_slack_notification_success() -> None:
         )
         assert res == "1729946793.000200"
         assert mock_urlopen.called
+        req = mock_urlopen.call_args[0][0]
+        payload = json.loads(req.data.decode("utf-8"))
+        pax_field_text = payload["blocks"][1]["fields"][3]["text"]
+        assert "*PAX (12):*" in pax_field_text
+        for pax_name in pax_list:
+            assert pax_name in pax_field_text
+        assert "more)" not in pax_field_text
 
 
 def test_slack_notification_extracts_ts_from_nested_message() -> None:
