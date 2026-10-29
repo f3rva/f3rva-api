@@ -191,4 +191,6 @@ def test_get_workout_schedule_multi_page_pagination(
     assert len(requested_urls) == 2
     assert "pageSize=100" in requested_urls[0]
     assert "pageIndex=0" in requested_urls[0]
+    assert "sorting[0][desc]=false" in requested_urls[0]
+    assert "sorting[1][desc]=false" in requested_urls[0]
     assert "pageIndex=1" in requested_urls[1]
