@@ -102,7 +102,7 @@ class ScheduleService:
             api_url = (
                 f"https://api.f3nation.com/v1/event?regionIds={region_id}&statuses=active"
                 f"&pageSize={page_size}&pageIndex={page_index}"
-                f"&sorting[0][id]=dayOfWeek&sorting[0][desc]=&sorting[1][id]=parent&sorting[1][desc]="
+                f"&sorting[0][id]=dayOfWeek&sorting[0][desc]=false&sorting[1][id]=parent&sorting[1][desc]=false"
             )
 
             req = urllib.request.Request(
