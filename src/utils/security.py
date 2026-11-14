@@ -74,17 +74,25 @@ def get_current_user(
     return payload
 
 
+def has_admin_role(payload: dict[str, Any] | None) -> bool:
+    """Return True if the decoded JWT payload contains the 'admin' role claim."""
+    if not payload:
+        return False
+    if payload.get("role") == "admin":
+        return True
+    roles = payload.get("roles")
+    return isinstance(roles, list) and "admin" in roles
+
+
 def get_current_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(security_bearer),
-) -> str:
-    """FastAPI dependency to protect admin endpoints using Bearer JWT authentication."""
+) -> dict[str, Any]:
+    """FastAPI dependency to protect admin endpoints using stateless Bearer JWT role claims."""
     payload = get_current_user(credentials)
-    username = payload.get("sub")
-    role = payload.get("role")
-    if role != "admin" or not username:
+    if not has_admin_role(payload):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"errorCode": 4003, "errorMessage": "Admin role required."},
         )
-    return str(username)
+    return payload
 

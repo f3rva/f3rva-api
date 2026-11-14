@@ -252,7 +252,7 @@ def update_workout(
 def delete_workout(
     db: DbSession,
     workout_id: int,
-    current_admin: Annotated[str, Depends(get_current_admin)],
+    current_admin: Annotated[dict[str, Any], Depends(get_current_admin)],
 ) -> DeleteWorkoutResponse:
     """Delete a workout and its attendee records (Admin only)."""
     return WorkoutMutationService.delete_workout(db=db, workout_id=workout_id)

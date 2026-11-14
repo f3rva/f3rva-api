@@ -12,6 +12,7 @@ from src.models.workout import (
     MemberAlias,
     MemberAliasAudit,
     MemberAliasRequest,
+    MemberRole,
     MemberSlack,
 )
 from src.services.email_service import EmailService
@@ -337,6 +338,27 @@ class AliasService:
             else:
                 # Otherwise reassign alias mapping to primary member
                 a_slack.member_id = primary_id
+        db.flush()
+
+        # 6b. Handle MEMBER_ROLE mapping merge
+        alias_roles = db.execute(
+            select(MemberRole).where(MemberRole.member_id == alias_id)
+        ).scalars().all()
+        for a_role in alias_roles:
+            primary_role = db.execute(
+                select(MemberRole).where(
+                    MemberRole.member_id == primary_id,
+                    MemberRole.role == a_role.role,
+                )
+            ).scalar_one_or_none()
+            if primary_role:
+                db.delete(a_role)
+            else:
+                a_role.member_id = primary_id
+        db.execute(
+            text("UPDATE MEMBER_ROLE SET GRANTED_BY = :p WHERE GRANTED_BY = :a"),
+            {"p": primary_id, "a": alias_id},
+        )
         db.flush()
 
         # 7. Delete the duplicate member entity

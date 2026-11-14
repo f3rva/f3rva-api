@@ -253,23 +253,56 @@ class AliasRequestResponse(BaseModel):
     status: str = Field(..., description="Request status (pending, approved, rejected)")
 
 
-class AdminLoginRequest(BaseModel):
-    """Admin login credentials."""
+class GrantMemberRoleRequest(BaseModel):
+    """Request payload to grant an access control role to a member."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
-    username: str = Field(default="admin", description="Admin username")
-    password: str = Field(..., description="Admin password")
+    role: str = Field(default="admin", min_length=1, max_length=32, description="Role identifier to grant (e.g., 'admin')")
 
 
-class TokenResponse(BaseModel):
-    """JWT Access Token response."""
+class MemberRoleAssignmentResponse(BaseModel):
+    """Response DTO representing an assigned role in MEMBER_ROLE."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId", description="F3 Member ID")
+    f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name", description="Member's F3 Name")
+    slack_display_name: str | None = Field(
+        default=None,
+        alias="slackDisplayName",
+        serialization_alias="slackDisplayName",
+        description="Linked Slack display name if available",
+    )
+    role: str = Field(..., description="Assigned role identifier (e.g., 'admin')")
+    granted_by_member_id: int | None = Field(
+        default=None,
+        alias="grantedByMemberId",
+        serialization_alias="grantedByMemberId",
+        description="Member ID of administrator who granted the role",
+    )
+    granted_by_f3_name: str | None = Field(
+        default=None,
+        alias="grantedByF3Name",
+        serialization_alias="grantedByF3Name",
+        description="F3 Name of administrator who granted the role",
+    )
+    created_at: str | None = Field(
+        default=None,
+        alias="createdAt",
+        serialization_alias="createdAt",
+        description="ISO timestamp when role was granted",
+    )
+
+
+class RevokeMemberRoleResponse(BaseModel):
+    """Response returned after revoking a member role."""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    access_token: str = Field(..., alias="accessToken", serialization_alias="accessToken")
-    token_type: str = Field(default="bearer", alias="tokenType", serialization_alias="tokenType")
-    expires_in: int = Field(default=86400, alias="expiresIn", serialization_alias="expiresIn")
+    message: str = Field(..., description="Confirmation message")
+    member_id: int = Field(..., alias="memberId", serialization_alias="memberId")
+    role: str = Field(..., description="Revoked role identifier")
 
 
 class WorkoutScheduleItem(BaseModel):
@@ -335,7 +368,8 @@ class AuthUserProfile(BaseModel):
     member_id: int = Field(..., alias="memberId", serialization_alias="memberId")
     f3_name: str = Field(..., alias="f3Name", serialization_alias="f3Name")
     slack_user_id: str = Field(..., alias="slackUserId", serialization_alias="slackUserId")
-    role: str = Field(default="member", description="User role: member or admin")
+    role: str = Field(default="member", description="Primary user role: member or admin")
+    roles: list[str] = Field(default_factory=lambda: ["member"], description="List of all assigned roles")
 
 
 class SlackAuthResponse(BaseModel):

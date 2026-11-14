@@ -81,16 +81,14 @@ def get_current_user_profile(
     current_user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> AuthUserProfile:
     """Retrieve profile and roles for the current authenticated user session."""
-    role = current_user.get("role", "member")
+    role = str(current_user.get("role", "member"))
+    raw_roles = current_user.get("roles")
+    roles: list[str] = (
+        [str(r) for r in raw_roles]
+        if isinstance(raw_roles, list) and raw_roles
+        else ([role, "member"] if role != "member" else ["member"])
+    )
     member_id = current_user.get("member_id")
-
-    if role == "admin" and not member_id:
-        return AuthUserProfile(
-            memberId=0,
-            f3Name=str(current_user.get("sub", "admin")),
-            slackUserId="",
-            role="admin",
-        )
 
     if not member_id:
         raise HTTPException(
@@ -111,5 +109,6 @@ def get_current_user_profile(
         memberId=member.member_id,
         f3Name=member.f3_name,
         slackUserId=str(current_user.get("sub", "")),
-        role=role,
+        role="admin" if "admin" in roles else role,
+        roles=roles,
     )

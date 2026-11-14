@@ -58,6 +58,7 @@ src/
 │   ├── workout_mutation_service.py      # Structured workout additions, author updates & transactional deletions
 │   ├── member_service.py                # Member profiles, attendance stats & search
 │   ├── report_service.py                # Attendance aggregations & recursive streakers algorithm
+│   ├── role_service.py                  # Role-Based Access Control (MEMBER_ROLE) assignments & audit
 │   └── alias_service.py                 # Multi-table atomic alias merger, audit & MEMBER_SLACK reconciliation
 └── utils/
     ├── __init__.py

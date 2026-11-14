@@ -20,7 +20,7 @@ from src.models.schemas import (
     SlackAuthResponse,
     SlackUserProfile,
 )
-from src.models.workout import Member, MemberAlias, MemberSlack
+from src.models.workout import Member, MemberAlias, MemberRole, MemberSlack
 from src.utils.logging import timed_service
 from src.utils.security import create_access_token, decode_access_token
 
@@ -140,6 +140,23 @@ class SlackAuthService:
         )
 
     @classmethod
+    def get_member_roles(cls, db: Session, member_id: int) -> list[str]:
+        """Retrieve all assigned roles for a member from MEMBER_ROLE, always including base 'member' role."""
+        assigned_roles = (
+            db.execute(
+                select(MemberRole.role)
+                .where(MemberRole.member_id == member_id)
+                .order_by(MemberRole.role.asc())
+            )
+            .scalars()
+            .all()
+        )
+        roles: list[str] = [r.strip().lower() for r in assigned_roles if r and r.strip()]
+        if "member" not in roles:
+            roles.append("member")
+        return roles
+
+    @classmethod
     @timed_service
     def handle_slack_login(cls, db: Session, slack_user: SlackUserProfile) -> SlackAuthResponse:
         """Check if Slack user is linked in MEMBER_SLACK; if linked, issue JWT; otherwise suggest profile."""
@@ -167,12 +184,16 @@ class SlackAuthService:
                     detail={"errorCode": 2001, "errorMessage": f"Linked member {linked.member_id} not found."},
                 )
 
+            roles = cls.get_member_roles(db, member.member_id)
+            primary_role = "admin" if "admin" in roles else "member"
+
             token = create_access_token(
                 data={
                     "sub": slack_user.slack_user_id,
                     "member_id": member.member_id,
                     "f3_name": member.f3_name,
-                    "role": "member",
+                    "role": primary_role,
+                    "roles": roles,
                 },
                 expires_delta=MEMBER_SESSION_DURATION,
             )
@@ -185,7 +206,8 @@ class SlackAuthService:
                     memberId=member.member_id,
                     f3Name=member.f3_name,
                     slackUserId=slack_user.slack_user_id,
-                    role="member",
+                    role=primary_role,
+                    roles=roles,
                 ),
             )
 
@@ -293,12 +315,16 @@ class SlackAuthService:
 
         db.commit()
 
+        roles = cls.get_member_roles(db, member.member_id)
+        primary_role = "admin" if "admin" in roles else "member"
+
         token = create_access_token(
             data={
                 "sub": slack_user_id,
                 "member_id": member.member_id,
                 "f3_name": member.f3_name,
-                "role": "member",
+                "role": primary_role,
+                "roles": roles,
             },
             expires_delta=MEMBER_SESSION_DURATION,
         )
@@ -312,7 +338,8 @@ class SlackAuthService:
                 memberId=member.member_id,
                 f3Name=member.f3_name,
                 slackUserId=slack_user_id,
-                role="member",
+                role=primary_role,
+                roles=roles,
             ),
         )
 

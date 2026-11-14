@@ -33,6 +33,7 @@ from src.models.workout import (
 from src.services.ai_summary_service import AISummaryService
 from src.services.slack_notification_service import SlackNotificationService
 from src.utils.logging import timed_service
+from src.utils.security import has_admin_role
 
 
 class WorkoutMutationService:
@@ -148,7 +149,7 @@ class WorkoutMutationService:
             )
 
         # Enforce edit permissions: Admin or Original Author / Leader
-        if current_user and current_user.get("role") != "admin":
+        if current_user and not has_admin_role(current_user):
             user_f3_name = current_user.get("f3_name", "").strip().lower()
             user_member_id = current_user.get("member_id")
 
