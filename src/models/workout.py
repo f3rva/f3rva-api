@@ -65,6 +65,26 @@ class MemberSlack(Base):
     )
 
 
+class MemberRole(Base):
+    """Member Role assignment entity with composite primary key (MEMBER_ID, ROLE)."""
+
+    __tablename__ = "MEMBER_ROLE"
+
+    member_id: Mapped[int] = mapped_column(
+        "MEMBER_ID", Integer, ForeignKey("MEMBER.MEMBER_ID", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column("ROLE", String(32), primary_key=True)
+    granted_by: Mapped[int | None] = mapped_column(
+        "GRANTED_BY", Integer, ForeignKey("MEMBER.MEMBER_ID", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime.datetime | None] = mapped_column(
+        "CREATED_AT",
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.UTC),
+        nullable=True,
+    )
+
+
 class MemberAliasRequest(Base):
     """Member Alias Claim Request entity using composite primary key (PRIMARY_ID, ALIAS_ID, STATUS)."""
 

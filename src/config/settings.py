@@ -79,10 +79,8 @@ class Settings(BaseSettings):
     db_pool_recycle: int | None = Field(default=None, description="Connection recycle duration in seconds")
     db_connect_args: dict[str, Any] | None = Field(default=None, description="Custom database engine connection arguments")
 
-    # Security & Admin Authentication
-    jwt_secret_key: str | None = Field(default=None, description="JWT secret key for signing admin authentication tokens")
-    admin_username: str | None = Field(default=None, description="Admin username for management endpoints")
-    admin_password: str | None = Field(default=None, description="Admin password for management endpoints")
+    # Security & JWT Authentication
+    jwt_secret_key: str | None = Field(default=None, description="JWT secret key for signing authentication tokens")
 
     # F3 Nation Schedule Integration
     f3_nation_api_key: str | None = Field(default=None, description="API Key for api.f3nation.com")

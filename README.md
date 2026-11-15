@@ -119,9 +119,7 @@ The API strictly reads configuration from OS environment variables, local `.env`
 | `DATABASE_URL` | **Yes** | MySQL connection URL with URL-encoded password | `mysql+pymysql://user:pass@host:3306/db?charset=utf8mb4` |
 | `DB_POOL_PRE_PING` | Optional | Proactively test and reconnect dropped connections | `true` (default: `true`) |
 | `DB_POOL_RECYCLE` | Optional | Connection recycle duration in seconds (idle timeout prevention) | `300` (default: `300`) |
-| `JWT_SECRET_KEY` | **Yes** | Secret key for signing admin and member JWT tokens | 32+ character random secret |
-| `ADMIN_USERNAME` | **Yes** | Admin authentication username | `admin` |
-| `ADMIN_PASSWORD` | **Yes** | Admin authentication password | High-entropy password |
+| `JWT_SECRET_KEY` | **Yes** | Secret key for signing stateless JWT tokens | 32+ character random secret |
 | `F3_NATION_API_KEY` | Optional | API key for upstream F3 Nation schedule sync | `f3_...` |
 | `SLACK_CLIENT_ID` | Optional | Slack App Client ID for Sign in with Slack | OAuth client ID |
 | `SLACK_CLIENT_SECRET` | Optional | Slack App Client Secret for Sign in with Slack | OAuth client secret |

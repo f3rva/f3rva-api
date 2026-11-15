@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from src.models.workout import AO, Member, MemberAlias, MemberSlack
+from src.models.workout import AO, Member, MemberAlias, MemberRole, MemberSlack
 from src.utils.security import create_access_token
 
 
@@ -316,14 +316,64 @@ def test_get_current_user_profile_member_success(client: TestClient, db_session:
     assert data["role"] == "member"
 
 
-def test_get_current_user_profile_admin_success(client: TestClient) -> None:
-    """Verify GET /v2/auth/me returns admin profile."""
-    token = create_access_token(data={"sub": "admin", "role": "admin"})
+def test_get_current_user_profile_admin_success(client: TestClient, db_session: Session) -> None:
+    """Verify GET /v2/auth/me returns admin profile when user has admin role in token."""
+    member = Member(member_id=1, f3_name="Splinter")
+    db_session.add(member)
+    db_session.commit()
+
+    token = create_access_token(
+        data={
+            "sub": "U_SPLINTER",
+            "member_id": 1,
+            "f3_name": "Splinter",
+            "role": "admin",
+            "roles": ["admin", "member"],
+        }
+    )
     res = client.get("/v2/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     data = res.json()
-    assert data["f3Name"] == "admin"
+    assert data["memberId"] == 1
+    assert data["f3Name"] == "Splinter"
     assert data["role"] == "admin"
+    assert data["roles"] == ["admin", "member"]
+
+
+def test_slack_login_with_member_role_admin_grants_admin_jwt(client: TestClient, db_session: Session) -> None:
+    """Verify Slack user whose member has 'admin' in MEMBER_ROLE receives admin role in JWT and profile."""
+    member = Member(member_id=1, f3_name="Splinter")
+    db_session.add(member)
+    db_session.flush()
+
+    db_session.add(
+        MemberSlack(
+            member_id=member.member_id,
+            slack_team_id="T_PROD",
+            slack_user_id="U_ADMIN_1",
+            slack_display_name="Splinter",
+        )
+    )
+    db_session.add(MemberRole(member_id=member.member_id, role="admin", granted_by=member.member_id))
+    db_session.commit()
+
+    token_resp = MagicMock()
+    token_resp.read.return_value = b'{"ok": true, "access_token": "xoxp-123", "id_token": "a.eyJzdWIiOiAiVV9BRE1JTl8xIiwgImh0dHBzOi8vc2xhY2suY29tL3RlYW1faWQiOiAiVF9QUk9EIiwgImh0dHBzOi8vc2xhY2suY29tL3VzZXJfaWQiOiAiVV9BRE1JTl8xIiwgIm5hbWUiOiAiU3BsaW50ZXIifQ==.c"}'
+    token_resp.__enter__.return_value = token_resp
+
+    with patch("src.services.slack_auth_service.get_settings") as mock_settings, \
+         patch("urllib.request.urlopen", return_value=token_resp):
+        mock_settings.return_value.slack_client_id = "client_id"
+        mock_settings.return_value.slack_client_secret = "client_secret"
+        mock_settings.return_value.slack_allowed_team_id = "T_PROD"
+
+        res = client.post("/v2/auth/slack", json={"code": "valid_code", "redirectUri": "http://localhost/callback"})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["isLinked"] is True
+        assert data["user"]["role"] == "admin"
+        assert "admin" in data["user"]["roles"]
+        assert "member" in data["user"]["roles"]
 
 
 def test_get_current_user_profile_missing_token_401(client: TestClient) -> None:

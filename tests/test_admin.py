@@ -15,6 +15,7 @@ from src.models.workout import (
     Member,
     MemberAlias,
     MemberAliasAudit,
+    MemberRole,
     MemberSlack,
     Workout,
     WorkoutAO,
@@ -58,26 +59,124 @@ def seed_admin_test_data(db: Session) -> dict[str, int]:
     db.add(WorkoutPax(workout_id=402, member_id=2))
     db.add(WorkoutPax(workout_id=402, member_id=3))
 
+    # Seed Member 1 as initial admin in MEMBER_ROLE
+    db.add(MemberRole(member_id=1, role="admin", granted_by=1))
+
     db.commit()
     return {"dingo": 1, "wild_dingo": 2, "lab_rat": 3}
 
 
-def test_admin_login_success(client: TestClient) -> None:
-    """Verify POST /v2/admin/login with correct credentials returns valid JWT token."""
-    response = client.post("/v2/admin/login", json={"username": "admin", "password": "admin"})
-    assert response.status_code == 200
-    data = response.json()
-    assert "accessToken" in data
-    assert data["tokenType"] == "bearer"
-    assert data["expiresIn"] == 86400
+def test_admin_get_roles_and_grant_revoke_lifecycle(client: TestClient, db_session: Session) -> None:
+    """Verify GET /v2/admin/roles, POST /v2/admin/members/{id}/roles, and DELETE /v2/admin/members/{id}/roles/{role}."""
+    seed_admin_test_data(db_session)
+    admin_token = create_access_token(
+        data={"sub": "U1", "member_id": 1, "f3_name": "Dingo", "role": "admin", "roles": ["admin", "member"]}
+    )
+
+    # 1. List existing roles (Member 1 seeded as admin)
+    list_res = client.get("/v2/admin/roles", headers={"Authorization": f"Bearer {admin_token}"})
+    assert list_res.status_code == 200
+    roles_data = list_res.json()
+    assert len(roles_data) == 1
+    assert roles_data[0]["memberId"] == 1
+    assert roles_data[0]["f3Name"] == "Dingo"
+    assert roles_data[0]["role"] == "admin"
+
+    # 2. Grant admin role to Member 3 (Lab Rat)
+    grant_res = client.post(
+        "/v2/admin/members/3/roles",
+        json={"role": "admin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert grant_res.status_code == 201
+    granted = grant_res.json()
+    assert granted["memberId"] == 3
+    assert granted["f3Name"] == "Lab Rat"
+    assert granted["role"] == "admin"
+    assert granted["grantedByMemberId"] == 1
+    assert granted["grantedByF3Name"] == "Dingo"
+
+    # 3. Granting again is idempotent
+    grant_again_res = client.post(
+        "/v2/admin/members/3/roles",
+        json={"role": "admin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert grant_again_res.status_code == 201
+    assert grant_again_res.json()["memberId"] == 3
+
+    # 4. Revoke admin role from Member 3
+    revoke_res = client.delete(
+        "/v2/admin/members/3/roles/admin",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert revoke_res.status_code == 200
+    assert revoke_res.json()["memberId"] == 3
+    assert revoke_res.json()["role"] == "admin"
 
 
-def test_admin_login_invalid_credentials(client: TestClient) -> None:
-    """Verify POST /v2/admin/login returns 401 on incorrect password."""
-    response = client.post("/v2/admin/login", json={"username": "admin", "password": "wrong-password"})
-    assert response.status_code == 401
-    data = response.json()
-    assert data["errorCode"] == 4001
+def test_admin_role_validation_and_self_revoke_guard(client: TestClient, db_session: Session) -> None:
+    """Verify invalid role returns 400, unknown member returns 404, and self-revocation is blocked with 400."""
+    seed_admin_test_data(db_session)
+    admin_token = create_access_token(
+        data={"sub": "U1", "member_id": 1, "f3_name": "Dingo", "role": "admin", "roles": ["admin", "member"]}
+    )
+
+    # Invalid role name -> 400
+    bad_role_res = client.post(
+        "/v2/admin/members/3/roles",
+        json={"role": "super_overlord"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert bad_role_res.status_code == 400
+    assert bad_role_res.json()["errorCode"] == 4004
+
+    # Unknown member -> 404
+    missing_member_res = client.post(
+        "/v2/admin/members/9999/roles",
+        json={"role": "admin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert missing_member_res.status_code == 404
+    assert missing_member_res.json()["errorCode"] == 2001
+
+    # Self-revocation guard -> 400
+    self_revoke_res = client.delete(
+        "/v2/admin/members/1/roles/admin",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert self_revoke_res.status_code == 400
+    assert self_revoke_res.json()["errorCode"] == 4005
+
+    # Revoking non-existent role assignment -> 404
+    missing_role_res = client.delete(
+        "/v2/admin/members/3/roles/admin",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert missing_role_res.status_code == 404
+    assert missing_role_res.json()["errorCode"] == 4006
+
+
+def test_merge_members_reconciles_member_roles(client: TestClient, db_session: Session) -> None:
+    """Verify merging members transfers MEMBER_ROLE entries and resolves conflicts cleanly."""
+    seed_admin_test_data(db_session)
+    # Give Member 2 (Wild Dingo) admin role and merge into Member 3 (Lab Rat, who has no roles yet)
+    db_session.add(MemberRole(member_id=2, role="admin", granted_by=1))
+    db_session.commit()
+
+    admin_token = create_access_token(
+        data={"sub": "U1", "member_id": 1, "f3_name": "Dingo", "role": "admin", "roles": ["admin", "member"]}
+    )
+    merge_res = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 3, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert merge_res.status_code == 200
+
+    # Verify Member 3 inherited the 'admin' role from Member 2
+    inherited_role = db_session.query(MemberRole).filter_by(member_id=3, role="admin").first()
+    assert inherited_role is not None
 
 
 def test_submit_alias_claim_request_success(client: TestClient, db_session: Session) -> None:

@@ -405,33 +405,45 @@ collection = {
             "name": "5. Self-Service & Admin Workflows",
             "item": [
                 {
-                    "name": "Admin Login (Obtain JWT)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "if (pm.response.code === 200) {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    if (jsonData.accessToken) {",
-                                    "        pm.environment.set('authToken', jsonData.accessToken);",
-                                    "        console.log('Saved authToken to environment:', jsonData.accessToken);",
-                                    "    }",
-                                    "}"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
+                    "name": "List Role Assignments (Protected)",
+                    "request": {
+                        "method": "GET",
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {"key": "token", "value": "{{authToken}}", "type": "string"}
+                            ]
+                        },
+                        "header": [{"key": "Accept", "value": "application/json", "type": "text"}],
+                        "url": {
+                            "raw": "{{apiBaseUrl}}/v2/admin/roles?role=admin",
+                            "host": ["{{apiBaseUrl}}"],
+                            "path": ["v2", "admin", "roles"],
+                            "query": [
+                                {"key": "role", "value": "admin", "description": "Optional role filter (e.g. admin)"}
+                            ]
+                        },
+                        "description": "Lists member role assignments from MEMBER_ROLE. Requires admin JWT obtained via Slack OAuth (/v2/auth/slack)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Grant Member Role (Protected)",
                     "request": {
                         "method": "POST",
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {"key": "token", "value": "{{authToken}}", "type": "string"}
+                            ]
+                        },
                         "header": [
                             {"key": "Content-Type", "value": "application/json", "type": "text"},
                             {"key": "Accept", "value": "application/json", "type": "text"}
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"change-me-admin-password\"\n}",
+                            "raw": "{\n  \"role\": \"admin\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -439,11 +451,31 @@ collection = {
                             }
                         },
                         "url": {
-                            "raw": "{{apiBaseUrl}}/v2/admin/login",
+                            "raw": "{{apiBaseUrl}}/v2/admin/members/1/roles",
                             "host": ["{{apiBaseUrl}}"],
-                            "path": ["v2", "admin", "login"]
+                            "path": ["v2", "admin", "members", "1", "roles"]
                         },
-                        "description": "Authenticates admin credentials and returns an HS256 JWT Bearer token (auto-saved to {{authToken}} environment variable)."
+                        "description": "Grants a role (e.g. admin) to a member. Requires admin JWT."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Revoke Member Role (Protected)",
+                    "request": {
+                        "method": "DELETE",
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {"key": "token", "value": "{{authToken}}", "type": "string"}
+                            ]
+                        },
+                        "header": [{"key": "Accept", "value": "application/json", "type": "text"}],
+                        "url": {
+                            "raw": "{{apiBaseUrl}}/v2/admin/members/2/roles/admin",
+                            "host": ["{{apiBaseUrl}}"],
+                            "path": ["v2", "admin", "members", "2", "roles", "admin"]
+                        },
+                        "description": "Revokes a role from a member (self-revocation of own admin role is blocked). Requires admin JWT."
                     },
                     "response": []
                 },
