@@ -185,7 +185,11 @@ class SlackAuthService:
                 )
 
             roles = cls.get_member_roles(db, member.member_id)
-            primary_role = "admin" if "admin" in roles else "member"
+            primary_role = (
+                "admin"
+                if "admin" in roles
+                else ("moderator" if "moderator" in roles else "member")
+            )
 
             token = create_access_token(
                 data={
@@ -316,7 +320,11 @@ class SlackAuthService:
         db.commit()
 
         roles = cls.get_member_roles(db, member.member_id)
-        primary_role = "admin" if "admin" in roles else "member"
+        primary_role = (
+            "admin"
+            if "admin" in roles
+            else ("moderator" if "moderator" in roles else "member")
+        )
 
         token = create_access_token(
             data={

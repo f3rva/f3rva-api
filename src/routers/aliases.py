@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from src.config.database import get_db
 from src.models.schemas import AliasClaimRequest, AliasRequestResponse, ErrorResponse
 from src.services.alias_service import AliasService
-from src.utils.security import get_current_user, has_admin_role
+from src.utils.security import get_current_user, has_moderator_or_admin_role
 
 router = APIRouter()
 
@@ -40,7 +40,7 @@ def request_alias(
 ) -> AliasRequestResponse:
     """Submit a self-service alias claim request."""
     # Enforce that regular members can only claim aliases for their own profile
-    if not has_admin_role(current_user):
+    if not has_moderator_or_admin_role(current_user):
         user_member_id = current_user.get("member_id")
         if user_member_id is None or int(payload.primary_member_id) != int(user_member_id):
             raise HTTPException(

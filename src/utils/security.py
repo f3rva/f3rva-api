@@ -84,15 +84,38 @@ def has_admin_role(payload: dict[str, Any] | None) -> bool:
     return isinstance(roles, list) and "admin" in roles
 
 
+def has_moderator_or_admin_role(payload: dict[str, Any] | None) -> bool:
+    """Return True if the decoded JWT payload contains 'admin' or 'moderator' role claims."""
+    if not payload:
+        return False
+    if payload.get("role") in ("admin", "moderator"):
+        return True
+    roles = payload.get("roles")
+    return isinstance(roles, list) and ("admin" in roles or "moderator" in roles)
+
+
 def get_current_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(security_bearer),
 ) -> dict[str, Any]:
-    """FastAPI dependency to protect admin endpoints using stateless Bearer JWT role claims."""
+    """FastAPI dependency to protect strictly admin-only endpoints (e.g., role management)."""
     payload = get_current_user(credentials)
     if not has_admin_role(payload):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"errorCode": 4003, "errorMessage": "Admin role required."},
+        )
+    return payload
+
+
+def get_current_moderator_or_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_bearer),
+) -> dict[str, Any]:
+    """FastAPI dependency to protect operational endpoints accessible to moderators and admins."""
+    payload = get_current_user(credentials)
+    if not has_moderator_or_admin_role(payload):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"errorCode": 4003, "errorMessage": "Moderator or Admin role required."},
         )
     return payload
 

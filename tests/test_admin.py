@@ -520,3 +520,59 @@ def test_admin_direct_merge_forbidden_for_non_admin_member(client: TestClient, d
     assert response.status_code == 403
     assert response.json()["errorCode"] == 4003
 
+
+def test_moderator_role_permissions_and_restrictions(client: TestClient, db_session: Session) -> None:
+    """Verify moderator can approve aliases and merge PAX, but is forbidden from managing roles."""
+    seed_admin_test_data(db_session)
+    admin_token = create_access_token(
+        data={"sub": "U_ADMIN", "member_id": 1, "role": "admin", "roles": ["admin", "member"]}
+    )
+
+    # Admin grants 'moderator' to Member 3 (Chong Li)
+    grant_res = client.post(
+        "/v2/admin/members/3/roles",
+        json={"role": "moderator"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert grant_res.status_code == 201
+    assert grant_res.json()["role"] == "moderator"
+
+    moderator_token = create_access_token(
+        data={"sub": "U_MOD", "member_id": 3, "role": "moderator", "roles": ["moderator", "member"]}
+    )
+
+    # Moderator CAN list pending alias requests and merge members
+    list_res = client.get(
+        "/v2/admin/aliases/requests",
+        headers={"Authorization": f"Bearer {moderator_token}"},
+    )
+    assert list_res.status_code == 200
+
+    merge_res = client.post(
+        "/v2/admin/members/merge",
+        json={"primaryMemberId": 1, "aliasMemberId": 2},
+        headers={"Authorization": f"Bearer {moderator_token}"},
+    )
+    assert merge_res.status_code == 200
+
+    # Moderator CANNOT view, grant, or revoke roles (403 Forbidden)
+    roles_get = client.get(
+        "/v2/admin/roles",
+        headers={"Authorization": f"Bearer {moderator_token}"},
+    )
+    assert roles_get.status_code == 403
+
+    roles_post = client.post(
+        "/v2/admin/members/1/roles",
+        json={"role": "moderator"},
+        headers={"Authorization": f"Bearer {moderator_token}"},
+    )
+    assert roles_post.status_code == 403
+
+    roles_delete = client.delete(
+        "/v2/admin/members/3/roles/moderator",
+        headers={"Authorization": f"Bearer {moderator_token}"},
+    )
+    assert roles_delete.status_code == 403
+
+
