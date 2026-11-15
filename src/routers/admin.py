@@ -18,28 +18,29 @@ from src.models.schemas import (
 )
 from src.services.alias_service import AliasService
 from src.services.role_service import RoleService
-from src.utils.security import get_current_admin
+from src.utils.security import get_current_admin, get_current_moderator_or_admin
 
 router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
 CurrentAdmin = Annotated[dict[str, Any], Depends(get_current_admin)]
+CurrentModerator = Annotated[dict[str, Any], Depends(get_current_moderator_or_admin)]
 
 
 @router.get(
     "/aliases/requests",
     response_model=list[AliasRequestResponse],
-    summary="Get pending alias requests (Admin)",
-    description="Retrieves all pending member alias requests awaiting administrator approval (Requires Admin Bearer Token).",
+    summary="Get pending alias requests (Moderator / Admin)",
+    description="Retrieves all pending member alias requests awaiting approval (Requires Moderator or Admin Bearer Token).",
     responses={
         200: {"description": "List of pending alias requests."},
         401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
-        403: {"model": ErrorResponse, "description": "Admin role required."},
+        403: {"model": ErrorResponse, "description": "Moderator or Admin role required."},
     },
 )
 def get_pending_alias_requests(
     db: DbSession,
-    current_admin: CurrentAdmin,
+    current_admin: CurrentModerator,
 ) -> list[AliasRequestResponse]:
     """Retrieve all pending alias requests."""
     return AliasService.get_pending_requests(db=db)
@@ -48,12 +49,12 @@ def get_pending_alias_requests(
 @router.post(
     "/aliases/approve/{primary_member_id}/{alias_member_id}",
     response_model=AliasRequestResponse,
-    summary="Approve alias request (Admin)",
-    description="Approves a member alias request, merges attendance records, updates aliases, and removes the duplicate member (Requires Admin Bearer Token).",
+    summary="Approve alias request (Moderator / Admin)",
+    description="Approves a member alias request, merges attendance records, updates aliases, and removes the duplicate member (Requires Moderator or Admin Bearer Token).",
     responses={
         200: {"description": "Alias approved and records merged successfully."},
         401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
-        403: {"model": ErrorResponse, "description": "Admin role required."},
+        403: {"model": ErrorResponse, "description": "Moderator or Admin role required."},
         404: {"model": ErrorResponse, "description": "Alias request not found."},
     },
 )
@@ -61,7 +62,7 @@ def approve_alias_request(
     db: DbSession,
     primary_member_id: int,
     alias_member_id: int,
-    current_admin: CurrentAdmin,
+    current_admin: CurrentModerator,
 ) -> AliasRequestResponse:
     """Approve alias request and merge records."""
     return AliasService.approve_alias(
@@ -72,12 +73,12 @@ def approve_alias_request(
 @router.post(
     "/aliases/reject/{primary_member_id}/{alias_member_id}",
     response_model=AliasRequestResponse,
-    summary="Reject alias request (Admin)",
-    description="Rejects a pending member alias request (Requires Admin Bearer Token).",
+    summary="Reject alias request (Moderator / Admin)",
+    description="Rejects a pending member alias request (Requires Moderator or Admin Bearer Token).",
     responses={
         200: {"description": "Alias request rejected successfully."},
         401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
-        403: {"model": ErrorResponse, "description": "Admin role required."},
+        403: {"model": ErrorResponse, "description": "Moderator or Admin role required."},
         404: {"model": ErrorResponse, "description": "Alias request not found."},
     },
 )
@@ -85,7 +86,7 @@ def reject_alias_request(
     db: DbSession,
     primary_member_id: int,
     alias_member_id: int,
-    current_admin: CurrentAdmin,
+    current_admin: CurrentModerator,
 ) -> AliasRequestResponse:
     """Reject a pending alias request."""
     return AliasService.reject_alias(
@@ -96,20 +97,20 @@ def reject_alias_request(
 @router.post(
     "/members/merge",
     response_model=AliasRequestResponse,
-    summary="Directly merge two members (Admin)",
-    description="Directly merges a duplicate member record into a primary member, creates audit trails, updates aliases, and reassigns attendance (Requires Admin Bearer Token).",
+    summary="Directly merge two members (Moderator / Admin)",
+    description="Directly merges a duplicate member record into a primary member, creates audit trails, updates aliases, and reassigns attendance (Requires Moderator or Admin Bearer Token).",
     responses={
         200: {"description": "Members merged successfully."},
         400: {"model": ErrorResponse, "description": "Cannot merge identical members."},
         401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
-        403: {"model": ErrorResponse, "description": "Admin role required."},
+        403: {"model": ErrorResponse, "description": "Moderator or Admin role required."},
         404: {"model": ErrorResponse, "description": "One or more members not found."},
     },
 )
 def direct_merge_members(
     db: DbSession,
     payload: AliasClaimRequest,
-    current_admin: CurrentAdmin,
+    current_admin: CurrentModerator,
 ) -> AliasRequestResponse:
     """Directly merge two member entities."""
     return AliasService.direct_merge(

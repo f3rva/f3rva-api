@@ -12,7 +12,7 @@ from src.models.schemas import MemberRoleAssignmentResponse, RevokeMemberRoleRes
 from src.models.workout import Member, MemberRole, MemberSlack
 from src.utils.logging import timed_service
 
-ALLOWED_ROLES: frozenset[str] = frozenset({"admin"})
+ALLOWED_ROLES: frozenset[str] = frozenset({"admin", "moderator"})
 
 
 class RoleService:

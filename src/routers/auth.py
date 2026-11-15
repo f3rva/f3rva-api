@@ -105,10 +105,15 @@ def get_current_user_profile(
             detail={"errorCode": 2001, "errorMessage": f"Member with ID {member_id} not found."},
         )
 
+    primary_role = (
+        "admin"
+        if "admin" in roles
+        else ("moderator" if "moderator" in roles else role)
+    )
     return AuthUserProfile(
         memberId=member.member_id,
         f3Name=member.f3_name,
         slackUserId=str(current_user.get("sub", "")),
-        role="admin" if "admin" in roles else role,
+        role=primary_role,
         roles=roles,
     )

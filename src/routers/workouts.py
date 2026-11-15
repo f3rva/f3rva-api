@@ -22,7 +22,7 @@ from src.models.schemas import (
 from src.models.workout import AO
 from src.services.workout_mutation_service import WorkoutMutationService
 from src.services.workout_service import WorkoutService
-from src.utils.security import get_current_admin, get_current_user
+from src.utils.security import get_current_moderator_or_admin, get_current_user
 
 router = APIRouter()
 
@@ -241,18 +241,19 @@ def update_workout(
 @router.delete(
     "/{workout_id}",
     response_model=DeleteWorkoutResponse,
-    summary="Delete workout by ID (Admin)",
-    description="Deletes a workout and all associated attendee, leader, AO, and detail records (Requires Bearer Token).",
+    summary="Delete workout by ID (Moderator / Admin)",
+    description="Deletes a workout and all associated attendee, leader, AO, and detail records (Requires Moderator or Admin Bearer Token).",
     responses={
         200: {"description": "Workout deleted successfully."},
         401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
+        403: {"model": ErrorResponse, "description": "Moderator or Admin role required."},
         404: {"model": ErrorResponse, "description": "Workout not found."},
     },
 )
 def delete_workout(
     db: DbSession,
     workout_id: int,
-    current_admin: Annotated[dict[str, Any], Depends(get_current_admin)],
+    current_admin: Annotated[dict[str, Any], Depends(get_current_moderator_or_admin)],
 ) -> DeleteWorkoutResponse:
-    """Delete a workout and its attendee records (Admin only)."""
+    """Delete a workout and its attendee records (Moderator or Admin)."""
     return WorkoutMutationService.delete_workout(db=db, workout_id=workout_id)
