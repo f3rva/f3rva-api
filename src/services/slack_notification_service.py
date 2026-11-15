@@ -85,16 +85,16 @@ class SlackNotificationService:
         fields = [
             {"type": "mrkdwn", "text": f"*Date:* {escaped_date}"},
             {"type": "mrkdwn", "text": f"*AO:* {ao_str}"},
-            {"type": "mrkdwn", "text": f"*QIC:*\n{q_str}"},
-            {"type": "mrkdwn", "text": f"*PAX ({pax_count}):*\n{pax_str}"},
+            {"type": "mrkdwn", "text": f"*QIC:* {q_str}"},
+            {"type": "mrkdwn", "text": f"*PAX ({pax_count}):* {pax_str}"},
         ]
         if escaped_fngs:
             fng_str = ", ".join(escaped_fngs)
-            fields.append({"type": "mrkdwn", "text": f"*FNGs ({len(escaped_fngs)}):*\n{fng_str}"})
+            fields.append({"type": "mrkdwn", "text": f"*FNGs ({len(escaped_fngs)}):* {fng_str}"})
         if escaped_drs:
             dr_str = ", ".join(escaped_drs)
             fields.append(
-                {"type": "mrkdwn", "text": f"*Downrange ({len(escaped_drs)}):*\n{dr_str}"}
+                {"type": "mrkdwn", "text": f"*Downrange ({len(escaped_drs)}):* {dr_str}"}
             )
 
         blocks: list[dict[str, Any]] = [
