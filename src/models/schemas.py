@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -394,3 +396,36 @@ class SlackConfirmLinkRequest(BaseModel):
 
     temp_token: str = Field(..., alias="tempToken", description="Temporary signed token from initial Slack handshake")
     member_id: int = Field(..., alias="memberId", description="Selected F3 Member ID to link")
+
+
+class WeeklySummaryRequest(BaseModel):
+    """Admin request payload for generating an on-demand weekly workout and announcement digest."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    start_date: datetime.date = Field(..., alias="startDate", description="Inclusive start date (YYYY-MM-DD)")
+    end_date: datetime.date = Field(..., alias="endDate", description="Inclusive end date (YYYY-MM-DD)")
+    post_to_slack: bool = Field(
+        default=True,
+        alias="postToSlack",
+        description="Whether to post the generated digest to #1st-f-fitness",
+    )
+
+
+class WeeklySummaryResponse(BaseModel):
+    """Response payload returned after generating a period workout and announcement digest."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    start_date: str = Field(..., alias="startDate", serialization_alias="startDate")
+    end_date: str = Field(..., alias="endDate", serialization_alias="endDate")
+    workout_count: int = Field(..., alias="workoutCount", serialization_alias="workoutCount")
+    total_pax_appearances: int = Field(
+        ..., alias="totalPaxAppearances", serialization_alias="totalPaxAppearances"
+    )
+    unique_pax: int = Field(..., alias="uniquePax", serialization_alias="uniquePax")
+    fng_count: int = Field(..., alias="fngCount", serialization_alias="fngCount")
+    highlights: list[str] = Field(default_factory=list, description="Highlighted workouts with links")
+    announcements: list[str] = Field(default_factory=list, description="Aggregated announcements and events")
+    posted_to_slack: bool = Field(..., alias="postedToSlack", serialization_alias="postedToSlack")
+    slack_ts: str | None = Field(default=None, alias="slackTs", serialization_alias="slackTs")

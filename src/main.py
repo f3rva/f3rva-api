@@ -14,10 +14,11 @@ from mangum import Mangum
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from src.config.database import get_db
+from src.config.database import get_db, get_sessionmaker
 from src.config.settings import Settings, get_settings
 from src.config.version import get_version
 from src.routers import admin, aliases, auth, members, reports, schedule, workouts
+from src.services.weekly_summary_service import WeeklySummaryService
 
 settings = get_settings()
 APP_VERSION = get_version()
@@ -200,4 +201,22 @@ def health_check_db(
 
 
 # AWS Lambda ASGI Adapter entrypoint
-handler = Mangum(app, lifespan="off")
+mangum_handler = Mangum(app, lifespan="off")
+
+
+def handler(event: dict[str, Any], context: Any) -> Any:
+    """Route scheduled EventBridge invocations to batch tasks and HTTP requests to Mangum."""
+    if isinstance(event, dict) and event.get("_scheduled_task") == "weekly_digest":
+        logger.info("Executing scheduled weekly_digest task.")
+        session_factory = get_sessionmaker()
+        db = session_factory()
+        try:
+            result = WeeklySummaryService.generate_previous_week_digest(db=db)
+            return {
+                "statusCode": 200,
+                "body": result.model_dump(by_alias=True),
+            }
+        finally:
+            db.close()
+
+    return mangum_handler(event, context)

@@ -399,8 +399,8 @@ def test_update_backblast_summary_skipped_when_unconfigured_or_missing_ts() -> N
         assert res_no_token is False
 
 
-def test_slack_notification_includes_sanitized_tldr_summary_block() -> None:
-    """Verify TL;DR summary block is inserted below header and escapes mrkdwn control characters."""
+def test_slack_notification_includes_sanitized_subtitle_block() -> None:
+    """Verify movie-trailer subtitle block is inserted below header without TLDR prefix and escapes mrkdwn."""
     import json
 
     mock_resp = MagicMock()
@@ -427,8 +427,83 @@ def test_slack_notification_includes_sanitized_tldr_summary_block() -> None:
         req = mock_urlopen.call_args[0][0]
         payload = json.loads(req.data.decode("utf-8"))
         blocks = payload["blocks"]
-        assert len(blocks) == 4
-        assert blocks[1]["type"] == "section"
-        assert blocks[1]["text"]["text"] == "> *TL;DR:* _10 PAX crushed hill repeats &amp; merkins &lt;!channel&gt;._"
+        assert len(blocks) == 3
+        assert blocks[0]["type"] == "section"
+        assert (
+            blocks[0]["text"]["text"]
+            == "<https://f3rva.org/summary-beatdown|*Summary Beatdown*>\n_10 PAX crushed hill repeats &amp; merkins &lt;!channel&gt;._"
+        )
+
+
+def test_post_weekly_digest_success_and_sanitization() -> None:
+    """Verify weekly digest posts to #1st-f-fitness with stats, safe links, and announcements."""
+    import json
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = b'{"ok": true, "ts": "1729950000.000500"}'
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("src.services.slack_notification_service.get_settings") as mock_settings, \
+         patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        mock_settings.return_value.slack_bot_token = "xoxb-test-token"
+        mock_settings.return_value.slack_fitness_channel_id = "C_FITNESS"
+
+        ts = SlackNotificationService.post_weekly_digest(
+            start_date="2026-11-09",
+            end_date="2026-11-15",
+            workout_count=24,
+            total_pax_appearances=312,
+            unique_pax=118,
+            fng_count=3,
+            highlight_items=[
+                {
+                    "text": "Picnic table climbs & <!channel> shenanigans",
+                    "title": "Dogpile <Epic>",
+                    "url": "https://f3rva.org/2026/11/10/dogpile-epic",
+                },
+                {
+                    "text": "Unsafe URL should not become a link",
+                    "title": "Bad Link Post",
+                    "url": "javascript:alert(1)",
+                },
+            ],
+            announcements=["Convergence at Dogpile Saturday 0700 & coffee after!"],
+        )
+
+        assert ts == "1729950000.000500"
+        req = mock_urlopen.call_args[0][0]
+        payload = json.loads(req.data.decode("utf-8"))
+        assert payload["channel"] == "C_FITNESS"
+
+        blocks_text = json.dumps(payload["blocks"])
+        assert "*Workouts:* 24" in blocks_text
+        assert "*Total PAX:* 312" in blocks_text
+        assert "*Unique PAX:* 118" in blocks_text
+        assert "*FNGs:* 3" in blocks_text
+        assert "&lt;!channel&gt;" in blocks_text
+        assert "<!channel>" not in blocks_text
+        assert "<https://f3rva.org/2026/11/10/dogpile-epic|*Dogpile &lt;Epic&gt;*>" in blocks_text
+        assert "javascript:" not in blocks_text
+        assert "(*Bad Link Post*)" in blocks_text
+        assert "*Announcements &amp; Upcoming Events*" in blocks_text or "*Announcements & Upcoming Events*" in blocks_text
+
+
+def test_post_weekly_digest_skipped_when_unconfigured() -> None:
+    """Verify post_weekly_digest returns None if slack_fitness_channel_id or bot token is missing."""
+    with patch("src.services.slack_notification_service.get_settings") as mock_settings:
+        mock_settings.return_value.slack_bot_token = "xoxb-test-token"
+        mock_settings.return_value.slack_fitness_channel_id = None
+
+        ts = SlackNotificationService.post_weekly_digest(
+            start_date="2026-11-09",
+            end_date="2026-11-15",
+            workout_count=1,
+            total_pax_appearances=5,
+            unique_pax=5,
+            fng_count=0,
+            highlight_items=[{"text": "Great workout", "title": "Test", "url": None}],
+            announcements=[],
+        )
+        assert ts is None
 
 

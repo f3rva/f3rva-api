@@ -80,6 +80,8 @@ class SlackNotificationService:
         post_link = candidate_url if _is_safe_url(candidate_url) else None
 
         header_text = f"<{post_link}|*{escaped_title}*>" if post_link else f"*{escaped_title}*"
+        if escaped_summary:
+            header_text = f"{header_text}\n_{escaped_summary}_"
         footer_text = f"Posted by *{escaped_author}*"
 
         fields = [
@@ -105,31 +107,17 @@ class SlackNotificationService:
                     "text": header_text,
                 },
             },
+            {
+                "type": "section",
+                "fields": fields,
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {"type": "mrkdwn", "text": footer_text},
+                ],
+            },
         ]
-        if escaped_summary:
-            blocks.append(
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"> *TL;DR:* _{escaped_summary}_",
-                    },
-                }
-            )
-        blocks.extend(
-            [
-                {
-                    "type": "section",
-                    "fields": fields,
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {"type": "mrkdwn", "text": footer_text},
-                    ],
-                },
-            ]
-        )
 
         fallback_text = f"{escaped_title} ({escaped_date}) at {ao_str}"
         return fallback_text, blocks
@@ -281,3 +269,152 @@ class SlackNotificationService:
             payload=payload,
         )
         return res_data is not None
+
+    @staticmethod
+    def _append_bullet_sections(
+        blocks: list[dict[str, Any]], heading: str, lines: list[str], max_chars: int = 2800
+    ) -> None:
+        """Append one or more mrkdwn section blocks for bullet lines, respecting Slack's 3000-char limit."""
+        if not lines:
+            return
+
+        current_chunk = heading
+        for line in lines:
+            candidate = f"{current_chunk}\n{line}" if current_chunk else line
+            if len(candidate) > max_chars and current_chunk:
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {"type": "mrkdwn", "text": current_chunk},
+                    }
+                )
+                current_chunk = line
+            else:
+                current_chunk = candidate
+
+        if current_chunk:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": current_chunk},
+                }
+            )
+
+    @classmethod
+    def _build_weekly_digest_message(
+        cls,
+        start_date: str,
+        end_date: str,
+        workout_count: int,
+        total_pax_appearances: int,
+        unique_pax: int,
+        fng_count: int,
+        highlight_items: list[dict[str, str | None]],
+        announcements: list[str],
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Build sanitized fallback text and Block Kit blocks for the weekly #1st-f-fitness digest."""
+        escaped_start = _escape_mrkdwn(start_date)
+        escaped_end = _escape_mrkdwn(end_date)
+        header_title = f"*F3 RVA Weekly Sitrep* ({escaped_start} to {escaped_end})"
+        stats_line = (
+            f"*Workouts:* {workout_count}  |  "
+            f"*Total PAX:* {total_pax_appearances}  |  "
+            f"*Unique PAX:* {unique_pax}  |  "
+            f"*FNGs:* {fng_count}"
+        )
+
+        blocks: list[dict[str, Any]] = [
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": header_title},
+            },
+            {
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": stats_line}],
+            },
+        ]
+
+        highlight_lines: list[str] = []
+        for item in highlight_items:
+            raw_text = (item.get("text") or "").strip()
+            if not raw_text:
+                continue
+            escaped_bullet = _escape_mrkdwn(raw_text)
+            raw_title = (item.get("title") or "").strip()
+            raw_url = (item.get("url") or "").strip()
+            if raw_title and _is_safe_url(raw_url):
+                escaped_link_title = _escape_mrkdwn(raw_title)
+                highlight_lines.append(f"• {escaped_bullet} (<{raw_url}|*{escaped_link_title}*>)")
+            elif raw_title:
+                escaped_link_title = _escape_mrkdwn(raw_title)
+                highlight_lines.append(f"• {escaped_bullet} (*{escaped_link_title}*)")
+            else:
+                highlight_lines.append(f"• {escaped_bullet}")
+
+        if highlight_lines:
+            blocks.append({"type": "divider"})
+            cls._append_bullet_sections(blocks, "*Workout Highlights*", highlight_lines)
+
+        announcement_lines = [
+            f"• {_escape_mrkdwn(a.strip())}" for a in announcements if a and a.strip()
+        ]
+        if announcement_lines:
+            blocks.append({"type": "divider"})
+            cls._append_bullet_sections(
+                blocks, "*Announcements & Upcoming Events*", announcement_lines
+            )
+
+        fallback_text = (
+            f"F3 RVA Weekly Sitrep ({escaped_start} to {escaped_end}) — "
+            f"{workout_count} workouts, {total_pax_appearances} total PAX"
+        )
+        return fallback_text, blocks
+
+    @classmethod
+    @timed_service
+    def post_weekly_digest(
+        cls,
+        start_date: str,
+        end_date: str,
+        workout_count: int,
+        total_pax_appearances: int,
+        unique_pax: int,
+        fng_count: int,
+        highlight_items: list[dict[str, str | None]],
+        announcements: list[str],
+    ) -> str | None:
+        """Post the weekly workout and announcement digest to #1st-f-fitness and return Slack 'ts'."""
+        settings = get_settings()
+        if not settings.slack_bot_token or not settings.slack_fitness_channel_id:
+            logger.info("Slack fitness channel not configured; skipping weekly digest post.")
+            return None
+
+        fallback_text, blocks = cls._build_weekly_digest_message(
+            start_date=start_date,
+            end_date=end_date,
+            workout_count=workout_count,
+            total_pax_appearances=total_pax_appearances,
+            unique_pax=unique_pax,
+            fng_count=fng_count,
+            highlight_items=highlight_items,
+            announcements=announcements,
+        )
+
+        payload: dict[str, Any] = {
+            "channel": settings.slack_fitness_channel_id,
+            "text": fallback_text,
+            "blocks": blocks,
+        }
+
+        res_data = cls._dispatch_slack_request(
+            api_url="https://slack.com/api/chat.postMessage",
+            token=settings.slack_bot_token,
+            payload=payload,
+        )
+        if not res_data:
+            return None
+
+        ts = res_data.get("ts")
+        if not ts and isinstance(res_data.get("message"), dict):
+            ts = res_data["message"].get("ts")
+        return str(ts) if ts else None

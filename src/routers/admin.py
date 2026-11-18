@@ -15,9 +15,12 @@ from src.models.schemas import (
     GrantMemberRoleRequest,
     MemberRoleAssignmentResponse,
     RevokeMemberRoleResponse,
+    WeeklySummaryRequest,
+    WeeklySummaryResponse,
 )
 from src.services.alias_service import AliasService
 from src.services.role_service import RoleService
+from src.services.weekly_summary_service import WeeklySummaryService
 from src.utils.security import get_current_admin, get_current_moderator_or_admin
 
 router = APIRouter()
@@ -195,4 +198,30 @@ def revoke_member_role(
         member_id=member_id,
         role=role,
         acting_member_id=int(acting_member_id) if acting_member_id is not None else None,
+    )
+
+
+@router.post(
+    "/summaries/weekly",
+    response_model=WeeklySummaryResponse,
+    summary="Generate weekly workout & announcement digest (Admin)",
+    description="Aggregates workouts and announcements across a date range (max 14 days) via Bedrock and optionally posts to #1st-f-fitness (Requires Admin Bearer Token).",
+    responses={
+        200: {"description": "Weekly digest generated successfully."},
+        400: {"model": ErrorResponse, "description": "Invalid date range or range exceeds 14 days."},
+        401: {"model": ErrorResponse, "description": "Missing or invalid authorization token."},
+        403: {"model": ErrorResponse, "description": "Admin role required."},
+    },
+)
+def generate_weekly_summary(
+    db: DbSession,
+    payload: WeeklySummaryRequest,
+    current_admin: CurrentAdmin,
+) -> WeeklySummaryResponse:
+    """Generate an on-demand weekly workout & announcement digest."""
+    return WeeklySummaryService.generate_period_summary(
+        db=db,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        post_to_slack=payload.post_to_slack,
     )
