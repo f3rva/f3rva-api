@@ -49,7 +49,8 @@ src/
 │   ├── aliases.py                       # /v2/aliases (self-service claim requests)
 │   └── admin.py                         # /v2/admin (login, approve, reject, merge records)
 ├── services/                            # Business Logic Layer (Free of transport details)
-│   ├── ai_summary_service.py            # AWS Bedrock Converse API 1-2 sentence TL;DR summarization
+│   ├── ai_summary_service.py            # AWS Bedrock Converse API movie-trailer teasers & shared Bedrock client
+│   ├── weekly_summary_service.py        # Weekly workout & announcement digest aggregation for #1st-f-fitness
 │   ├── schedule_service.py              # Upstream F3 Nation API integration & event transformations
 │   ├── slack_auth_service.py            # Slack OAuth OIDC exchange, team ID verification & member linking
 │   ├── slack_notification_service.py    # Block Kit backblast summaries dispatched to #backblasts
@@ -68,6 +69,7 @@ tests/                                   # Pytest suite
     ├── __init__.py
     ├── conftest.py                      # SQLite in-memory fixtures & TestClient instance
     ├── test_ai_summary_service.py
+    ├── test_weekly_summary_service.py
     ├── test_health.py
     ├── test_schedule.py
     ├── test_slack_auth.py

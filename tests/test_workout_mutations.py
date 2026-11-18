@@ -723,10 +723,10 @@ def test_update_workout_triggers_slack_update_when_ts_exists(
 def test_add_and_update_workout_pass_ai_summary_to_slack(
     client: TestClient, db_session: Session, auth_headers: dict[str, str]
 ) -> None:
-    """Verify add_workout and update_workout pass the AI-generated TL;DR summary to SlackNotificationService."""
+    """Verify add_workout and update_workout pass the AI-generated post teaser to SlackNotificationService."""
     with patch(
-        "src.services.workout_mutation_service.AISummaryService.generate_tldr_summary",
-        return_value="Dingo led 15 PAX through 200 merkins and hill sprints at First Watch.",
+        "src.services.workout_mutation_service.AISummaryService.generate_post_teaser",
+        return_value="Fifteen men, two hundred merkins, and zero dry shirts left on Cardiac Hill.",
     ) as mock_ai, patch(
         "src.services.workout_mutation_service.SlackNotificationService.post_backblast_summary",
         return_value="1729947000.000100",
@@ -753,7 +753,7 @@ def test_add_and_update_workout_pass_ai_summary_to_slack(
         assert mock_ai.call_count == 1
         assert (
             mock_post.call_args.kwargs["summary"]
-            == "Dingo led 15 PAX through 200 merkins and hill sprints at First Watch."
+            == "Fifteen men, two hundred merkins, and zero dry shirts left on Cardiac Hill."
         )
 
         update_res = client.put(
@@ -774,7 +774,7 @@ def test_add_and_update_workout_pass_ai_summary_to_slack(
         assert mock_ai.call_count == 2
         assert (
             mock_update.call_args.kwargs["summary"]
-            == "Dingo led 15 PAX through 200 merkins and hill sprints at First Watch."
+            == "Fifteen men, two hundred merkins, and zero dry shirts left on Cardiac Hill."
         )
 
 

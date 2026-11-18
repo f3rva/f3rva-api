@@ -93,13 +93,15 @@ class Settings(BaseSettings):
     slack_bot_token: str | None = Field(default=None, description="Slack App Bot User OAuth Token (xoxb-...)")
     slack_allowed_team_id: str | None = Field(default=None, description="Allowed Slack Team/Workspace ID (e.g., f3-rva-workspace)")
     slack_backblast_channel_id: str | None = Field(default=None, description="Slack Channel ID for #backblasts notifications")
+    slack_fitness_channel_id: str | None = Field(default=None, description="Slack Channel ID for #1st-f-fitness weekly digest posts")
 
     # Backblast & Email Configuration
     backblast_url_prefix: str | None = Field(default=None, description="Public site base URL prefix for constructing backblast permalinks")
     admin_email: str | None = Field(default=None, description="Admin email address for SES notifications (e.g., admin@f3rva.org)")
 
     # AI / AWS Bedrock Configuration
-    bedrock_model_id: str | None = Field(default=None, description="AWS Bedrock model or inference profile ID for backblast summarization")
+    bedrock_model_id_post_teaser: str | None = Field(default=None, description="AWS Bedrock model or inference profile ID for per-post movie-trailer teasers")
+    bedrock_model_id_weekly_digest: str | None = Field(default=None, description="AWS Bedrock model or inference profile ID for weekly #1st-f-fitness digests")
 
     # CORS Configuration
     cors_allowed_origins: str | None = Field(default=None, description="Optional comma-separated list of additional allowed CORS origins")

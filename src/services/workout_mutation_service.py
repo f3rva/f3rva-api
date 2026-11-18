@@ -104,7 +104,7 @@ class WorkoutMutationService:
                 a.name if isinstance(a, AOInput) else str(a)
                 for a in (data.aos if isinstance(data.aos, list) else [data.aos])
             ]
-            summary = AISummaryService.generate_tldr_summary(title=data.title, body=data.body)
+            summary = AISummaryService.generate_post_teaser(title=data.title, body=data.body)
             slack_ts = SlackNotificationService.post_backblast_summary(
                 title=data.title,
                 workout_date=str(parsed_date),
@@ -211,7 +211,7 @@ class WorkoutMutationService:
                 a.name if isinstance(a, AOInput) else str(a)
                 for a in (data.aos if isinstance(data.aos, list) else [data.aos])
             ]
-            summary = AISummaryService.generate_tldr_summary(title=data.title, body=data.body)
+            summary = AISummaryService.generate_post_teaser(title=data.title, body=data.body)
             SlackNotificationService.update_backblast_summary(
                 slack_ts=workout.slack_message_ts,
                 title=data.title,
