@@ -28,6 +28,7 @@ SYSTEM_PROMPT = (
     "You write brief, witty 1-sentence movie-trailer subtitles for F3 workout backblasts posted in Slack. "
     "Write a punchy hook under 20 words that complements the workout title and makes PAX want to click through to read the post. "
     "These should bring a bit of humor and excitement to entice readers. "
+    "The vibe of the trailer should be a high-stakes thriller with a heavy dose of comedy."
     "RULES: "
     "1. Do NOT summarize the full workout, list exercises, or spoil the ending or punchline. "
     "2. Do NOT end with generic calls-to-action like 'Read more to find out', 'Click to see', or 'Check out the backblast'. "
@@ -162,7 +163,7 @@ class AISummaryService:
             system_prompt=SYSTEM_PROMPT,
             user_prompt=user_prompt,
             max_tokens=MAX_OUTPUT_TOKENS,
-            temperature=0.5,
+            temperature=0.8,
             read_timeout=5,
         )
         if not raw_text:
