@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "41d01f88-363e-4910-8985-ed21bf2f0a39",
+    "_postman_id": "8dfaf80d-f877-4e6d-b130-980a39381648",
     "name": "F3 API",
     "description": "Complete Postman collection for the F3 modern Python serverless REST API (Phases 1 through 6). Configured to use Postman Environments (apiBaseUrl, authToken).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -1095,6 +1095,57 @@
               ]
             },
             "description": "Directly merges duplicate member record into primary without prior self-service request. Requires admin JWT."
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Weekly Digest (Protected)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDate\": \"2026-11-09\",\n  \"endDate\": \"2026-11-15\",\n  \"postToSlack\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{apiBaseUrl}}/v2/admin/summaries/weekly",
+              "host": [
+                "{{apiBaseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "admin",
+                "summaries",
+                "weekly"
+              ]
+            },
+            "description": "Aggregates workouts and announcements across a date range (max 14 days) via AWS Bedrock and optionally posts to #1st-f-fitness. Set postToSlack to false to preview without posting. Requires admin JWT."
           },
           "response": []
         }

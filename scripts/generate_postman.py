@@ -610,6 +610,38 @@ collection = {
                         "description": "Directly merges duplicate member record into primary without prior self-service request. Requires admin JWT."
                     },
                     "response": []
+                },
+                {
+                    "name": "Generate Weekly Digest (Protected)",
+                    "request": {
+                        "method": "POST",
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {"key": "token", "value": "{{authToken}}", "type": "string"}
+                            ]
+                        },
+                        "header": [
+                            {"key": "Content-Type", "value": "application/json", "type": "text"},
+                            {"key": "Accept", "value": "application/json", "type": "text"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"startDate\": \"2026-11-09\",\n  \"endDate\": \"2026-11-15\",\n  \"postToSlack\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{apiBaseUrl}}/v2/admin/summaries/weekly",
+                            "host": ["{{apiBaseUrl}}"],
+                            "path": ["v2", "admin", "summaries", "weekly"]
+                        },
+                        "description": "Aggregates workouts and announcements across a date range (max 14 days) via AWS Bedrock and optionally posts to #1st-f-fitness. Set postToSlack to false to preview without posting. Requires admin JWT."
+                    },
+                    "response": []
                 }
             ]
         },
