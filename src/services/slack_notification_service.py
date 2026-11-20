@@ -315,7 +315,7 @@ class SlackNotificationService:
         """Build sanitized fallback text and Block Kit blocks for the weekly #1st-f-fitness digest."""
         escaped_start = _escape_mrkdwn(start_date)
         escaped_end = _escape_mrkdwn(end_date)
-        header_title = f"*F3 RVA Weekly Sitrep* ({escaped_start} to {escaped_end})"
+        header_title = f"*F3 RVA Weekly Summary* ({escaped_start} to {escaped_end})"
         stats_line = (
             f"*Workouts:* {workout_count}  |  "
             f"*Total PAX:* {total_pax_appearances}  |  "
@@ -365,7 +365,7 @@ class SlackNotificationService:
             )
 
         fallback_text = (
-            f"F3 RVA Weekly Sitrep ({escaped_start} to {escaped_end}) — "
+            f"F3 RVA Weekly Summary ({escaped_start} to {escaped_end}) — "
             f"{workout_count} workouts, {total_pax_appearances} total PAX"
         )
         return fallback_text, blocks
